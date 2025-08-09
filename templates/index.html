@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MVP Speaking App</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { margin-top: 30px; }
+    button { margin: 4px; }
+    audio { display: block; margin-top: 8px; }
+    .muted { color: #666; font-size: 0.9em; }
+    .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; border:1px solid #ccc; font-size: 0.9em; }
+    .badge.good { border-color:#2e7d32; }
+    .badge.warn { border-color:#f9a825; }
+    .badge.bad  { border-color:#c62828; }
+    .word-bad { background: #fff3f3; }
+  </style>
+</head>
+<body>
+
+  <h1>MVP Speaking App</h1>
+
+  <h2>Course A: Phrase Practice</h2>
+  <input type="text" id="phrase" value="This is a sample phrase.">
+  <select id="lang1">
+    <option value="en-US">English (US)</option>
+    <option value="en-GB">English (UK)</option>
+  </select>
+  <br><br>
+  <button id="rec1">Record</button>
+  <button id="stop1" disabled>Stop</button>
+  <button id="send1" disabled>Send</button>
+  <span id="status1" class="muted"></span>
+  <audio id="audio1" controls></audio>
+  <div id="scores1" class="row"></div>
+  <div id="scores1_note" class="muted"></div>
+  <div id="recognized1" class="muted"></div>
+  <div id="words1"></div>
+
+  <hr>
+
+  <h2>Course B: Prompt Response</h2>
+  <p class="muted">Describe your favorite holiday and explain why you enjoy it.</p>
+  <select id="lang2">
+    <option value="en-US">English (US)</option>
+    <option value="en-GB">English (UK)</option>
+  </select>
+  <br><br>
+  <button id="rec2">Record</button>
+  <button id="stop2" disabled>Stop</button>
+  <button id="send2" disabled>Send</button>
+  <span id="status2" class="muted"></span>
+  <audio id="audio2" controls></audio>
+  <div id="scores2" class="row"></div>
+  <div id="scores2_note" class="muted"></div>
+  <div id="recognized2" class="muted"></div>
+  <div id="words2"></div>
+
+  <script src="{{ url_for('static', filename='recorder.js') }}"></script>
+</body>
+</html>
