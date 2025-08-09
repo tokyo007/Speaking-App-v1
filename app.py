@@ -8,6 +8,16 @@ app = Flask(__name__)
 SPEECH_KEY = os.environ.get("SPEECH_KEY")
 SPEECH_REGION = os.environ.get("SPEECH_REGION")
 
+from datetime import timedelta
+app = Flask(__name__)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = timedelta(seconds=0)
+
+@app.after_request
+def add_header(r):
+    r.headers['Cache-Control'] = 'no-store'
+    return r
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
