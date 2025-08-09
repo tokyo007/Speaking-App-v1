@@ -1,166 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>MVP Speaking App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <style>
     :root{
-      --bg:#0b132b;            /* header bg */
-      --brand:#1c7ed6;         /* primary */
-      --accent:#f59e0b;        /* accent */
-      --card:#ffffff;
-      --ink:#0f172a;
-      --muted:#64748b;
-      --border:#e5e7eb;
+      --brand-bg:#0b132b; --brand-primary:#1c7ed6; --brand-accent:#f59e0b;
+      --card:#ffffff; --text:#0f172a; --muted:#64748b; --border:#e5e7eb;
+      --bad:#dc2626; --warn:#f59e0b; --good:#16a34a;
     }
     *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      color:var(--ink);
-      background:#f6f7fb;
-    }
-
-    /* Header */
-    header{
-      background:var(--bg);
-      color:#fff;
-      padding:16px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-    }
-    header h1{
-      font-size:18px;
-      margin:0;
-      line-height:1.2;
-    }
-    header a{
-      color:#fff;
-      text-decoration:none;
-      opacity:.9;
-      font-size:14px;
-      white-space:nowrap;
-    }
-
-    /* Layout */
-    .wrap{max-width:960px; margin:16px auto; padding:0 16px}
-    .grid{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:16px;
-    }
-    .card{
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius:16px;
-      padding:16px;
-      box-shadow:0 1px 2px rgba(0,0,0,.03);
-    }
-    .title{margin:0 0 12px; font-weight:700}
-    .muted{color:var(--muted); font-size:14px}
-
-    /* Controls */
-    .controls{
-      display:grid;
-      gap:10px;
-      grid-template-columns:1fr 1fr 1fr;
-    }
-    .controls button{
-      padding:12px 10px;
-      border:1px solid var(--border);
-      border-radius:12px;
-      background:#fff;
-      cursor:pointer;
-      font-weight:600;
-    }
-    .controls button.primary{ background:var(--brand); color:#fff; border-color:transparent; }
-    .controls button.warn{ background:var(--accent); color:#111; border-color:transparent; }
-    .controls button:disabled{ opacity:.6; cursor:not-allowed; }
-
-    /* Status bar */
-    .status{
-      margin-top:10px;
-      padding:10px 12px;
-      border-radius:12px;
-      background:#f3f4f6;
-      border:1px solid var(--border);
-      font-size:14px;
-      min-height:42px;
-      display:flex; align-items:center;
-    }
-
-    /* Footer tip */
-    .tip{
-      margin-top:8px;
-      font-size:13px;
-      color:var(--muted);
-    }
-
-    /* Mobile first adjustments */
-    @media (max-width:900px){
-      .grid{ grid-template-columns:1fr; }
-    }
-    @media (max-width:480px){
-      header h1{ font-size:16px; }
-      .controls{ grid-template-columns:1fr; }
-      .controls button{ padding:14px; font-size:16px; }
-      .status{ font-size:15px; }
-    }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#f6f7fb;color:var(--text)}
+    header{background:var(--brand-bg);color:#fff;padding:16px;display:flex;align-items:center;justify-content:space-between}
+    header h1{font-size:18px;margin:0} header a{color:#fff;text-decoration:none;opacity:.9}
+    .wrap{max-width:1000px;margin:18px auto;padding:0 16px}
+    .grid{display:grid;gap:16px;grid-template-columns:1fr 1fr}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+    .section-title{font-weight:700;margin:0 0 8px}
+    .muted{color:var(--muted);font-size:13px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    input,select,button{border:1px solid var(--border);border-radius:10px;padding:10px}
+    input,select{width:100%;max-width:100%}
+    button{background:#fff;cursor:pointer}
+    button.primary{background:var(--brand-primary);color:#fff;border-color:transparent}
+    button.warn{background:var(--brand-accent);color:#111;border-color:transparent}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    audio{display:block;margin-top:8px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    @media (max-width:480px){header h1{font-size:16px}}
   </style>
 </head>
 <body>
   <header>
-    <h1>MakoStars • Speaking Practice</h1>
+    <h1>MakoStars • Speaking Practice (MVP)</h1>
     <a href="/report">View Last Report →</a>
   </header>
 
-  <main class="wrap">
-    <div class="grid">
-      <!-- Course A -->
-      <section class="card">
-        <h2 class="title">Course A — Phrase Practice</h2>
-        <p class="muted">Practice set phrases and receive pronunciation scores.</p>
+  <div class="wrap">
+    <!-- Course A -->
+    <section class="card">
+      <h2 class="section-title">Course A — Phrase Practice</h2>
+      <p class="muted">Choose a benchmark phrase (or randomize), record, and get pronunciation scores.</p>
 
- 	<input type="text" id="phrase" value="I really enjoy reading books and talking with friends on sunny afternoons.">
-	  <select id="lang1">
- 	   <option value="en-US">English (US)</option>
- 	   <option value="en-GB">English (UK)</option>
- 	 </select>
-	  <br><br>
+      <!-- Phrase rotation controls -->
+      <div class="row">
+        <select id="phraseSelect" aria-label="Benchmark phrase" style="flex:1 1 320px; min-width:260px"></select>
+        <button id="randomBtn" type="button" title="Randomize" class="warn">🎲 Random</button>
+      </div>
 
+      <!-- The value actually sent to backend -->
+      <div style="margin-top:8px">
+        <label for="phrase" class="muted">Selected phrase (editable)</label>
+        <input id="phrase" type="text" value="">
+      </div>
 
-        <div class="controls">
-          <button class="primary" onclick="startRecording('A')">Start Recording (A)</button>
-          <button class="" onclick="stopRecording()">Stop</button>
-          <button class="warn" onclick="window.location.href='/report'">Open Report</button>
-        </div>
+      <div class="row" style="margin-top:10px">
+        <label class="muted" for="lang1">Language:</label>
+        <select id="lang1">
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+        </select>
+      </div>
 
-        <div id="status" class="status">Press “Start Recording (A)” and allow microphone access.</div>
-        <p class="tip">Tip: If embedded in an LMS iframe, ensure the iframe has <code>allow="microphone"</code>.</p>
-      </section>
+      <div class="row" style="margin-top:12px">
+        <button id="rec1" class="primary">Record</button>
+        <button id="stop1" disabled>Stop</button>
+        <button id="send1" disabled>Send</button>
+        <span id="status1" class="muted"></span>
+      </div>
+      <audio id="audio1" controls></audio>
 
-      <!-- Course B -->
-      <section class="card">
-        <h2 class="title">Course B — Prompt Response</h2>
-        <p class="muted">Answer a prompt with a 30–60 second spoken reply. We’ll auto‑transcribe and assess.</p>
+      <h4 class="section-title" style="margin-top:14px">Result</h4>
+      <div id="scores1" class="row"></div>
+      <div id="scores1_note" class="muted" style="margin-top:4px;"></div>
+      <div id="recognized1" class="muted"></div>
+      <div id="words1"></div>
+    </section>
 
-        <div class="controls">
-          <button class="primary" onclick="startRecording('B')">Start Recording (B)</button>
-          <button class="" onclick="stopRecording()">Stop</button>
-          <button class="warn" onclick="window.location.href='/report'">Open Report</button>
-        </div>
+    <!-- Course B -->
+    <section class="card">
+      <h2 class="section-title">Course B — Prompt Response</h2>
+      <p class="muted">Answer the prompt with a 30–60 second spoken reply. We’ll auto‑transcribe and assess.</p>
+      <p><em>Prompt:</em> Describe your favorite holiday and explain why you enjoy it.</p>
 
-        <div class="status">After upload, you’ll be auto‑redirected to the report page.</div>
-        <p class="tip">Allow the mic via the lock icon in the browser bar if prompted.</p>
-      </section>
-    </div>
-  </main>
+      <div class="row" style="margin-top:10px">
+        <label class="muted" for="lang2">Language:</label>
+        <select id="lang2">
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+        </select>
+      </div>
 
-  <!-- Cache-busted JS to avoid stale versions -->
-  <script src="/static/recorder.js?v=2025-08-09-3"></script>
+      <div class="row" style="margin-top:12px">
+        <button id="rec2" class="primary">Record</button>
+        <button id="stop2" disabled>Stop</button>
+        <button id="send2" disabled>Send</button>
+        <span id="status2" class="muted"></span>
+      </div>
+      <audio id="audio2" controls></audio>
+
+      <h4 class="section-title" style="margin-top:14px">Result</h4>
+      <div id="scores2" class="row"></div>
+      <div id="scores2_note" class="muted" style="margin-top:4px;"></div>
+      <div id="recognized2" class="muted"></div>
+      <div id="transcript2" class="muted"></div>
+      <div id="words2"></div>
+    </section>
+  </div>
+
+  <!-- Cache-busted JS -->
+  <script src="{{ url_for('static', filename='recorder.js') }}?v=2025-08-09-4"></script>
+
+  <!-- Phrase rotation JS -->
+  <script>
+    (function(){
+      // Rotation set: pangram + conversational + academic + TH/phoneme focus
+      const phrases = [
+        {
+          id: 'pangram',
+          label: 'Pangram (broad coverage)',
+          text: 'The quick brown fox jumps over the lazy dog in the bright sunlight.'
+        },
+        {
+          id: 'conversational',
+          label: 'Conversational (EFL-friendly)',
+          text: 'I really enjoy reading books and talking with friends on sunny afternoons.'
+        },
+        {
+          id: 'academic',
+          label: 'Academic/IELTS tone',
+          text: 'Globalization significantly influences education, employment, and cultural exchange.'
+        },
+        {
+          id: 'th-contrast',
+          label: 'Th /r/ /l/ focus',
+          text: 'These thin threads are really harder than they look.'
+        }
+      ];
+
+      const sel = document.getElementById('phraseSelect');
+      const input = document.getElementById('phrase');
+      const randBtn = document.getElementById('randomBtn');
+
+      function populate(){
+        sel.innerHTML = phrases.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+        // Default to conversational (often friendliest for students)
+        sel.value = 'conversational';
+        input.value = phrases.find(p => p.id === 'conversational').text;
+      }
+
+      function setFromSelect(){
+        const chosen = phrases.find(p => p.id === sel.value);
+        if (chosen) input.value = chosen.text;
+      }
+
+      function randomize(){
+        const pick = phrases[Math.floor(Math.random() * phrases.length)];
+        sel.value = pick.id;
+        input.value = pick.text;
+      }
+
+      sel.addEventListener('change', setFromSelect);
+      randBtn.addEventListener('click', randomize);
+
+      populate();
+    })();
+  </script>
 </body>
 </html>
