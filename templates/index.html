@@ -1,62 +1,158 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>MVP Speaking App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h2 { margin-top: 30px; }
-    button { margin: 4px; }
-    audio { display: block; margin-top: 8px; }
-    .muted { color: #666; font-size: 0.9em; }
-    .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; border:1px solid #ccc; font-size: 0.9em; }
-    .badge.good { border-color:#2e7d32; }
-    .badge.warn { border-color:#f9a825; }
-    .badge.bad  { border-color:#c62828; }
-    .word-bad { background: #fff3f3; }
+    :root{
+      --bg:#0b132b;            /* header bg */
+      --brand:#1c7ed6;         /* primary */
+      --accent:#f59e0b;        /* accent */
+      --card:#ffffff;
+      --ink:#0f172a;
+      --muted:#64748b;
+      --border:#e5e7eb;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      color:var(--ink);
+      background:#f6f7fb;
+    }
+
+    /* Header */
+    header{
+      background:var(--bg);
+      color:#fff;
+      padding:16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    header h1{
+      font-size:18px;
+      margin:0;
+      line-height:1.2;
+    }
+    header a{
+      color:#fff;
+      text-decoration:none;
+      opacity:.9;
+      font-size:14px;
+      white-space:nowrap;
+    }
+
+    /* Layout */
+    .wrap{max-width:960px; margin:16px auto; padding:0 16px}
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 1px 2px rgba(0,0,0,.03);
+    }
+    .title{margin:0 0 12px; font-weight:700}
+    .muted{color:var(--muted); font-size:14px}
+
+    /* Controls */
+    .controls{
+      display:grid;
+      gap:10px;
+      grid-template-columns:1fr 1fr 1fr;
+    }
+    .controls button{
+      padding:12px 10px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#fff;
+      cursor:pointer;
+      font-weight:600;
+    }
+    .controls button.primary{ background:var(--brand); color:#fff; border-color:transparent; }
+    .controls button.warn{ background:var(--accent); color:#111; border-color:transparent; }
+    .controls button:disabled{ opacity:.6; cursor:not-allowed; }
+
+    /* Status bar */
+    .status{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      background:#f3f4f6;
+      border:1px solid var(--border);
+      font-size:14px;
+      min-height:42px;
+      display:flex; align-items:center;
+    }
+
+    /* Footer tip */
+    .tip{
+      margin-top:8px;
+      font-size:13px;
+      color:var(--muted);
+    }
+
+    /* Mobile first adjustments */
+    @media (max-width:900px){
+      .grid{ grid-template-columns:1fr; }
+    }
+    @media (max-width:480px){
+      header h1{ font-size:16px; }
+      .controls{ grid-template-columns:1fr; }
+      .controls button{ padding:14px; font-size:16px; }
+      .status{ font-size:15px; }
+    }
   </style>
 </head>
 <body>
+  <header>
+    <h1>MakoStars • Speaking Practice</h1>
+    <a href="/report">View Last Report →</a>
+  </header>
 
-  <h1>MVP Speaking App</h1>
+  <main class="wrap">
+    <div class="grid">
+      <!-- Course A -->
+      <section class="card">
+        <h2 class="title">Course A — Phrase Practice</h2>
+        <p class="muted">Practice set phrases and receive pronunciation scores.</p>
 
-  <h2>Course A: Phrase Practice</h2>
-  <input type="text" id="phrase" value="This is a sample phrase.">
-  <select id="lang1">
-    <option value="en-US">English (US)</option>
-    <option value="en-GB">English (UK)</option>
-  </select>
-  <br><br>
-  <button id="rec1">Record</button>
-  <button id="stop1" disabled>Stop</button>
-  <button id="send1" disabled>Send</button>
-  <span id="status1" class="muted"></span>
-  <audio id="audio1" controls></audio>
-  <div id="scores1" class="row"></div>
-  <div id="scores1_note" class="muted"></div>
-  <div id="recognized1" class="muted"></div>
-  <div id="words1"></div>
+        <div class="controls">
+          <button class="primary" onclick="startRecording('A')">Start Recording (A)</button>
+          <button class="" onclick="stopRecording()">Stop</button>
+          <button class="warn" onclick="window.location.href='/report'">Open Report</button>
+        </div>
 
-  <hr>
+        <div id="status" class="status">Press “Start Recording (A)” and allow microphone access.</div>
+        <p class="tip">Tip: If embedded in an LMS iframe, ensure the iframe has <code>allow="microphone"</code>.</p>
+      </section>
 
-  <h2>Course B: Prompt Response</h2>
-  <p class="muted">Describe your favorite holiday and explain why you enjoy it.</p>
-  <select id="lang2">
-    <option value="en-US">English (US)</option>
-    <option value="en-GB">English (UK)</option>
-  </select>
-  <br><br>
-  <button id="rec2">Record</button>
-  <button id="stop2" disabled>Stop</button>
-  <button id="send2" disabled>Send</button>
-  <span id="status2" class="muted"></span>
-  <audio id="audio2" controls></audio>
-  <div id="scores2" class="row"></div>
-  <div id="scores2_note" class="muted"></div>
-  <div id="recognized2" class="muted"></div>
-  <div id="words2"></div>
+      <!-- Course B -->
+      <section class="card">
+        <h2 class="title">Course B — Prompt Response</h2>
+        <p class="muted">Answer a prompt with a 30–60 second spoken reply. We’ll auto‑transcribe and assess.</p>
 
-  <script src="{{ url_for('static', filename='recorder.js') }}?v=2025-08-09-4"></script>
+        <div class="controls">
+          <button class="primary" onclick="startRecording('B')">Start Recording (B)</button>
+          <button class="" onclick="stopRecording()">Stop</button>
+          <button class="warn" onclick="window.location.href='/report'">Open Report</button>
+        </div>
+
+        <div class="status">After upload, you’ll be auto‑redirected to the report page.</div>
+        <p class="tip">Allow the mic via the lock icon in the browser bar if prompted.</p>
+      </section>
+    </div>
+  </main>
+
+  <!-- Cache-busted JS to avoid stale versions -->
+  <script src="/static/recorder.js?v=2025-08-09-3"></script>
 </body>
 </html>
