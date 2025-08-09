@@ -6,6 +6,7 @@ import ffmpeg
 import azure.cognitiveservices.speech as speechsdk
 
 load_dotenv()
+
 SPEECH_KEY = os.getenv("SPEECH_KEY")
 SPEECH_REGION = os.getenv("SPEECH_REGION", "japaneast")
 
@@ -14,14 +15,14 @@ CORS(app)
 
 def to_wav_16k_mono(input_path, output_path):
     (ffmpeg.input(input_path)
-           .output(output_path, acodec='pcm_s16le', ac=1, ar='16000', loglevel="error")
+           .output(output_path, acodec='pcm_s16le', ac=1, ar='16000', loglevel='error')
            .overwrite_output()
            .run())
     return output_path
 
 def run_pronunciation_assessment(wav_path, reference_text, language="en-US"):
     if not SPEECH_KEY or not SPEECH_REGION:
-        return {"status": "error", "message": "Azure SPEECH_KEY/REGION not set"}
+        return {"status":"error","message":"Azure SPEECH_KEY/REGION not set"}
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
     speech_config.speech_recognition_language = language
     audio_config = speechsdk.audio.AudioConfig(filename=wav_path)
@@ -37,7 +38,6 @@ def run_pronunciation_assessment(wav_path, reference_text, language="en-US"):
     if result.reason != speechsdk.ResultReason.RecognizedSpeech:
         return {"status":"error","message":f"Recognition failed: {result.reason}","raw":str(result)}
     pa = speechsdk.PronunciationAssessmentResult(result)
-    # Try to get word-level detail
     detail = {}
     try:
         jr = result.properties.get(speechsdk.PropertyId.SpeechServiceResponse_JsonResult)
@@ -45,7 +45,7 @@ def run_pronunciation_assessment(wav_path, reference_text, language="en-US"):
     except Exception:
         detail = {}
     return {
-        "status": "ok",
+        "status":"ok",
         "referenceText": reference_text,
         "recognizedText": result.text,
         "scores": {
@@ -59,19 +59,23 @@ def run_pronunciation_assessment(wav_path, reference_text, language="en-US"):
 
 def speech_to_text(wav_path, language="en-US"):
     if not SPEECH_KEY or not SPEECH_REGION:
-        return {"status": "error", "message": "Azure SPEECH_KEY/REGION not set"}
+        return {"status":"error","message":"Azure SPEECH_KEY/REGION not set"}
     speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
     speech_config.speech_recognition_language = language
     audio_config = speechsdk.audio.AudioConfig(filename=wav_path)
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     result = recognizer.recognize_once()
     if result.reason != speechsdk.ResultReason.RecognizedSpeech:
-        return {"status": "error", "message": f"STT failed: {result.reason}"}
-    return {"status": "ok", "text": result.text}
+        return {"status":"error","message":f"STT failed: {result.reason}"}
+    return {"status":"ok","text": result.text}
 
 @app.get("/")
 def index():
     return render_template("index.html")
+
+@app.get("/report")
+def report():
+    return render_template("report.html")
 
 @app.post("/assess_phrase")
 def assess_phrase():
@@ -114,4 +118,4 @@ def health():
     return "ok", 200
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=False)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT","5000")), debug=False)
