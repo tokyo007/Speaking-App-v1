@@ -1,4 +1,7 @@
 flask
-azure-cognitiveservices-speech
-gunicorn
+flask-cors
 python-dotenv
+azure-cognitiveservices-speech
+ffmpeg-python
+pydub
+gunicorn
