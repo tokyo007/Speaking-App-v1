@@ -1,5 +1,11 @@
 'use strict';
 
+/* ---------- Utilities ---------- */
+function byId(id){ return document.getElementById(id); }
+function setText(id, val){ const el = byId(id); if(el) el.textContent = val; }
+function setHTML(id, val){ const el = byId(id); if(el) el.innerHTML = val; }
+
+/* ---------- UI helpers ---------- */
 function badge(label,val){
   if(typeof val!=='number') return '';
   const cls = val>=80?'good':val>=60?'warn':'bad';
@@ -63,43 +69,74 @@ function downloadJSON(){
   const url = URL.createObjectURL(blob); const a = document.createElement('a');
   a.href = url; a.download = 'speaking_report.json'; document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); a.remove();
 }
+
+/* ---------- Render ---------- */
+function renderMetrics(r){
+  const m = r.metrics || {};
+  const html = `
+    <ul class="kvs">
+      <li><span>Duration</span><strong>${m.duration_mmss ?? '--:--'}</strong></li>
+      <li><span>Total Words</span><strong>${m.word_count ?? '-'}</strong></li>
+      <li><span>WPM</span><strong>${m.wpm ?? '-'}</strong></li>
+      <li><span>Filler Words</span><strong>${m.fillers_total ?? '-'}</strong></li>
+    </ul>
+  `;
+  setHTML('metrics', html);
+}
+
+function wirePdf(r){
+  const btn = byId('btnPdf');
+  if(btn && r.result_id){
+    btn.disabled = false;
+    btn.onclick = ()=> window.open(`/report_pdf/${r.result_id}`, '_blank');
+  }
+}
+
 window.addEventListener('DOMContentLoaded', ()=>{
   const r = getResult();
-  if(!r){ document.body.innerHTML = '<div class="wrap"><h2>No report data</h2><p class="muted">Go back and submit a recording first.</p><p><a href=\"/\">← Back</a></p></div>'; return; }
-  const meta = document.getElementById('meta'); const now = new Date().toLocaleString();
+  if(!r){
+    document.body.innerHTML = '<div class="wrap"><h2>No report data</h2><p class="muted">Go back and submit a recording first.</p><p><a href="/">← Back</a></p></div>';
+    return;
+  }
+  const now = new Date().toLocaleString();
   const mode = r.transcriptUsedAsReference ? 'Prompt Response' : 'Phrase Practice';
-  meta.textContent = `${mode} • ${now}`;
+  setText('meta', `${mode} • ${now}`);
 
-  const b = document.getElementById('badges'); const s = r.scores || {};
-  b.innerHTML = [ 'Overall', 'Accuracy', 'Fluency', 'Completeness' ]
-    .map((label,i)=>{
-      const val = i===0? s.pronunciation : i===1? s.accuracy : i===2? s.fluency : s.completeness;
-      return `<span class="badge ${val>=80?'good':val>=60?'warn':'bad'}">${label}: ${Math.round(val||0)}</span>`;
-    }).join(' ');
+  const s = r.scores || {};
+  const allBadges = ['Overall','Accuracy','Fluency','Completeness'].map((label,i)=>{
+    const val = i===0? s.pronunciation : i===1? s.accuracy : i===2? s.fluency : s.completeness;
+    return badge(label, Number(val||0));
+  }).join(' ');
+  setHTML('badges', allBadges);
 
-  const overall = s.pronunciation || 0;
-  document.getElementById('estimates').innerHTML =
-    `<strong>Estimates:</strong> ${estimateIELTS(overall)}; ${estimateEIKEN(overall)} <span class="muted">— based on pronunciation only</span>`;
+  const overall = Number(s.pronunciation||0);
+  setHTML('estimates', `<strong>Estimates:</strong> ${estimateIELTS(overall)}; ${estimateEIKEN(overall)} <span class="muted">— pronunciation only</span>`);
 
   const rnote = rubricNote(overall);
   const border = rnote.level==='good' ? '#16a34a' : rnote.level==='warn' ? '#f59e0b' : '#dc2626';
-  const rub = document.getElementById('rubric'); rub.style.borderLeftColor = border; rub.textContent = rnote.text;
+  const rub = byId('rubric'); if(rub){ rub.style.borderLeft = `4px solid ${border}`; rub.textContent = rnote.text; }
 
-  document.getElementById('recognized').innerHTML = `
+  setHTML('recognized', `
     <div><strong>Recognized:</strong> ${r.recognizedText || '(empty)'}</div>
     ${r.referenceText ? `<div><strong>Reference:</strong> ${r.referenceText}</div>` : ''}
     ${r.transcriptUsedAsReference ? `<div><strong>Reference (auto‑transcript):</strong> ${r.transcriptUsedAsReference}</div>` : ''}
-  `;
+  `);
 
-  document.getElementById('refTextPill').textContent = (r.referenceText || r.transcriptUsedAsReference) ?
+  setText('refTextPill', (r.referenceText || r.transcriptUsedAsReference) ?
     `Ref: ${(r.referenceText || r.transcriptUsedAsReference).slice(0,60)}${(r.referenceText || r.transcriptUsedAsReference).length>60?'…':''}`
-    : 'Ref: (none)';
-  document.getElementById('langPill').textContent = `Lang: en-US`; // update if you track per-session language
+    : 'Ref: (none)');
+  setText('langPill', `Lang: ${r.language || 'en-US'}`);
 
-  const bars = document.getElementById('bars');
-  bars.innerHTML = [ progress('Accuracy', s.accuracy), progress('Fluency', s.fluency), progress('Completeness', s.completeness) ].join('');
+  const barsHtml = [ progress('Accuracy', s.accuracy), progress('Fluency', s.fluency), progress('Completeness', s.completeness) ].join('');
+  setHTML('bars', barsHtml);
 
-  const words = (r.detail && (r.detail.NBest?.[0]?.Words || r.detail.nBest?.[0]?.words)) || [];
-  document.getElementById('wlNote').textContent = 'Rows in pink indicate likely issues (error or low accuracy).';
-  document.getElementById('wordsTable').innerHTML = wordsTable(words);
+  const words = extractWords(r.detail || {});
+  setText('wlNote','Rows in pink indicate likely issues (error or low accuracy).');
+  setHTML('wordsTable', wordsTable(words));
+
+  renderMetrics(r);
+  wirePdf(r);
 });
+
+// Expose for button
+window.downloadJSON = downloadJSON;

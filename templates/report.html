@@ -2,78 +2,68 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Speaking Report</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Speaking Assessment Report</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/styles.css" />
   <style>
-    :root{
-      --brand-bg:#0b132b;
-      --brand-primary:#1c7ed6;
-      --brand-accent:#f59e0b;
-      --card:#ffffff;
-      --muted:#64748b;
-      --ok:#16a34a; --warn:#f59e0b; --bad:#dc2626;
-      --border:#e5e7eb; --ink:#0f172a;
-    }
-    *{box-sizing:border-box} body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:#f6f7fb;color:var(--ink)}
-    header{background:var(--brand-bg); color:#fff; padding:18px 16px; display:flex; align-items:center; justify-content:space-between}
-    header a{color:#fff; text-decoration:none; opacity:.9}
-    .wrap{max-width:1000px;margin:18px auto;padding:0 16px}
-    .grid{display:grid;gap:16px;grid-template-columns:1.2fr 1fr}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
-    .muted{color:var(--muted);font-size:13px}
-    .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .badge{border:1px solid var(--border);border-radius:999px;padding:4px 10px;font-weight:600;font-size:13px}
-    .good{border-color:var(--ok)} .warn{border-color:var(--warn)} .bad{border-color:var(--bad)}
-    .bars{display:grid;gap:10px}
-    .bar{display:grid;gap:6px}
-    .bar label{font-size:13px;color:#374151}
-    .track{height:10px;background:#f3f4f6;border-radius:999px;overflow:hidden}
-    .fill{height:100%}
+    .wrap{max-width:900px;margin:20px auto;padding:0 12px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin:12px 0}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .pill{border:1px solid #e5e7eb;border-radius:999px;padding:4px 10px;background:#f8fafc}
+    .muted{color:#64748b}
+    .badge{display:inline-block;margin-right:6px;padding:2px 8px;border-radius:6px;background:#f1f5f9}
+    .badge.good{background:#ecfdf5}
+    .badge.warn{background:#fff7ed}
+    .badge.bad{background:#fef2f2}
+    .bar{margin:8px 0}
+    .bar .track{height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden}
+    .bar .fill{height:100%}
     table{width:100%;border-collapse:collapse}
-    th,td{border-bottom:1px solid #f1f5f9;padding:8px 6px;text-align:left;font-size:14px}
-    tr.bad td{background:#fff6f6}
-    .rubric{border-left:4px solid #e5e7eb;padding-left:10px}
-    .pill{padding:4px 10px;border-radius:999px;background:#eef2ff;font-size:12px;border:1px solid var(--border)}
-    @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+    th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left}
+    tr.bad{background:#fff1f2}
+    .kvs{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(200px,1fr));gap:8px}
+    .kvs li{display:flex;justify-content:space-between;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;background:#f8fafc}
   </style>
 </head>
 <body>
-  <header>
-    <div>Speaking Report</div>
-    <a href="/">← Back</a>
-  </header>
   <div class="wrap">
-    <div class="muted" id="meta"></div>
-    <div class="grid">
-      <div class="card">
-        <h3 style="margin:0 0 12px">Overview</h3>
-        <div class="row" id="badges"></div>
-        <div class="muted" style="margin-top:10px" id="estimates"></div>
-        <div class="rubric" style="margin-top:12px" id="rubric"></div>
-        <div style="margin-top:12px" class="muted" id="recognized"></div>
+    <header class="row" style="justify-content:space-between">
+      <h1>Speaking Assessment Report</h1>
+      <div id="meta" class="muted"></div>
+    </header>
+
+    <section class="card">
+      <div id="badges"></div>
+      <div id="estimates" class="muted" style="margin-top:8px"></div>
+      <div id="rubric" class="muted" style="margin-top:8px; padding-left:10px; border-left:4px solid #e5e7eb"></div>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <span class="pill" id="refTextPill">Ref: (none)</span>
+        <span class="pill" id="langPill">Lang: en-US</span>
       </div>
-      <div class="card">
-        <h3 style="margin:0 0 12px">Subscores</h3>
-        <div class="bars" id="bars"></div>
-      </div>
-    </div>
-    <div class="card" style="margin-top:16px">
-      <div class="row" style="justify-content:space-between">
-        <h3 style="margin:0">Word‑level Details</h3>
-        <div class="row">
-          <span class="pill" id="refTextPill"></span>
-          <span class="pill" id="langPill"></span>
-        </div>
-      </div>
-      <div class="muted" id="wlNote" style="margin:6px 0 10px"></div>
+      <div id="recognized" style="margin-top:8px"></div>
+      <div id="bars" style="margin-top:8px"></div>
+    </section>
+
+    <section class="card">
+      <h3>Word-level details</h3>
+      <div id="wlNote" class="muted"></div>
       <div id="wordsTable"></div>
-    </div>
-    <div id="metrics" class="card" style="margin-top:12px"></div>
-    <div class="row" style="justify-content:flex-end; margin-top:12px">
+    </section>
+
+    <section class="card">
+      <h3>Metrics</h3>
+      <div id="metrics"></div>
+    </section>
+
+    <div class="row" style="justify-content:flex-end; gap:8px">
       <button id="btnPdf" class="pill" disabled>Download PDF</button>
       <button class="pill" onclick="downloadJSON()">Download JSON</button>
     </div>
   </div>
-  <script src="{{ url_for('static', filename='report.js') }}?v=auto-report-1"></script>
+
+  <script src="/static/report.js?v=auto-report-3"></script>
 </body>
 </html>

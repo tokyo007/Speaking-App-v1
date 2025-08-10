@@ -1,5 +1,5 @@
 
-import os, json, tempfile, uuid, re, math, datetime
+import os, json, tempfile, uuid, re, datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template, send_file, url_for
@@ -69,7 +69,6 @@ def run_pronunciation_assessment(wav_path, reference_text, language="en-US"):
     speech_config.speech_recognition_language = language
     audio_config = speechsdk.audio.AudioConfig(filename=wav_path)
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-
     pa_config = speechsdk.PronunciationAssessmentConfig(
         reference_text=reference_text,
         grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
@@ -128,10 +127,6 @@ def metrics_from_transcript(transcript, duration_sec):
         "fillers_total": filler_total
     }
 
-BASE_DIR = Path(__file__).resolve().parent
-RESULT_DIR = BASE_DIR / "results"
-RESULT_DIR.mkdir(exist_ok=True)
-
 def persist_result(payload):
     rid = uuid.uuid4().hex
     path = RESULT_DIR / f"{rid}.json"
@@ -165,7 +160,7 @@ def assess_phrase():
     if not f:
         return jsonify({"status":"error","message":"Missing 'audio' file"}), 400
     ext = Path(f.filename or "audio.webm").suffix.lower()
-    if ext not in {".webm",".wav",".mp3",".ogg",".m4a"}:
+    if ext not in ALLOWED_EXT:
         return jsonify({"status":"error","message":"Unsupported audio type"}), 400
 
     with tempfile.TemporaryDirectory() as td:
@@ -191,7 +186,7 @@ def assess_prompt():
     if not f:
         return jsonify({"status":"error","message":"Missing 'audio' file"}), 400
     ext = Path(f.filename or "audio.webm").suffix.lower()
-    if ext not in {".webm",".wav",".mp3",".ogg",".m4a"}:
+    if ext not in ALLOWED_EXT:
         return jsonify({"status":"error","message":"Unsupported audio type"}), 400
 
     with tempfile.TemporaryDirectory() as td:
