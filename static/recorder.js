@@ -1,214 +1,116 @@
-let mediaRecorder, chunks = [], startTime = 0, stopTime = 0, timerInterval = null, lastDurationSec = 0;
+'use strict';
 
-const btnStart = document.getElementById('btnStart');
-const btnStop = document.getElementById('btnStop');
-const timer = document.getElementById('timer');
-const player = document.getElementById('player');
-const uploadStatus = document.getElementById('uploadStatus');
-const transcriptEl = document.getElementById('transcript');
-const reportEl = document.getElementById('report');
-const fileIdEl = document.getElementById('fileId');
-const btnAnalyze = document.getElementById('btnAnalyze');
-const btnAI = document.getElementById('btnAI');
-const aiOut = document.getElementById('aiOut');
+const ENDPOINT_PHRASE = '/assess_phrase';
+const ENDPOINT_PROMPT = '/assess_prompt';
 
-(function renderCourse() {
-  const phrasesUl = document.getElementById('phrases');
-  const rubricDiv = document.getElementById('rubric');
-  const data = window.COURSE_A || { phrases: [], rubric: [] };
+let mediaRecorder1=null, mediaRecorder2=null;
+let chunks1=[], chunks2=[];
+let blob1=null, blob2=null;
 
-  if (phrasesUl) {
-    phrasesUl.innerHTML = '';
-    data.phrases.forEach(p => {
-      const li = document.createElement('li');
-      li.textContent = p;
-      phrasesUl.appendChild(li);
-    });
+function setStatus(which, text) {
+  const id = which === 1 ? 'status1' : 'status2';
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function ensureMediaSupport() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('Your browser does not support microphone access. Use Chrome/Edge desktop.'); return false; }
+  if (typeof MediaRecorder === 'undefined') { alert('MediaRecorder not available. Use Chrome/Edge desktop.'); return false; }
+  return true;
+}
+function getStream() { return navigator.mediaDevices.getUserMedia({ audio: true }); }
+
+function setupRecorder(stream, which) {
+  const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+  const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  const chunks = which === 1 ? chunks1 : chunks2;
+  mr.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+  mr.onstop = () => {
+    const blob = new Blob(chunks, { type: mime || 'audio/webm' });
+    const url = URL.createObjectURL(blob);
+    if (which === 1) {
+      blob1 = blob; const a1 = document.getElementById('audio1'); if (a1) a1.src = url;
+      const s1 = document.getElementById('send1'); if (s1) s1.disabled = false;
+    } else {
+      blob2 = blob; const a2 = document.getElementById('audio2'); if (a2) a2.src = url;
+      const s2 = document.getElementById('send2'); if (s2) s2.disabled = false;
+    }
+  };
+  return mr;
+}
+
+async function postForm(url, formData) {
+  const res = await fetch(url, { method: 'POST', body: formData });
+  let json; try { json = await res.json(); } catch { throw new Error(`Non-JSON response (status ${res.status})`); }
+  if (!res.ok || json.status === 'error') {
+    const msg = json?.message || `Request failed (${res.status})`; const raw = json?.raw ? `\nRaw: ${json.raw}` : '';
+    throw new Error(`${msg}${raw}`);
   }
+  return json;
+}
 
-  if (rubricDiv) {
-    rubricDiv.innerHTML = '';
-    data.rubric.forEach(r => {
-      const d = document.createElement('div');
-      d.className = 'rubric-item';
-      const h = document.createElement('h4'); h.textContent = r.category;
-      const p = document.createElement('p'); p.textContent = r.description;
-      d.appendChild(h); d.appendChild(p);
-      rubricDiv.appendChild(d);
-    });
-  }
-})();
+window.addEventListener('DOMContentLoaded', () => {
+  console.log('recorder.js loaded');
 
-btnStart?.addEventListener('click', async () => {
-  try {
-    chunks = [];
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
-    mediaRecorder.ondataavailable = e => chunks.push(e.data);
-    mediaRecorder.onstop = onStopRecording;
-    mediaRecorder.start();
-    startTimer();
-    btnStart.disabled = true;
-    btnStop.disabled = false;
-    uploadStatus.textContent = '';
-    aiOut && (aiOut.textContent = '');
-    reportEl.textContent = '';
-  } catch (err) {
-    console.error(err);
-    alert('Microphone access failed.');
-  }
+  const rec1 = document.getElementById('rec1'); const stop1 = document.getElementById('stop1'); const send1 = document.getElementById('send1');
+  const rec2 = document.getElementById('rec2'); const stop2 = document.getElementById('stop2'); const send2 = document.getElementById('send2');
+  if (!rec1 || !stop1 || !send1 || !rec2 || !stop2 || !send2) { console.error('Missing controls in index.html'); return; }
+
+  // Course A
+  rec1.onclick = async () => {
+    if (!ensureMediaSupport()) return;
+    chunks1 = [];
+    try {
+      const s = await getStream();
+      mediaRecorder1 = setupRecorder(s, 1);
+      mediaRecorder1.start();
+      setStatus(1, 'recording...');
+      rec1.disabled = true; stop1.disabled = false;
+    } catch (e) { console.error(e); setStatus(1,'mic blocked'); alert('Allow microphone in the address bar.'); }
+  };
+  stop1.onclick = () => {
+    try { if (mediaRecorder1 && mediaRecorder1.state !== 'inactive') { mediaRecorder1.stop(); setStatus(1,'recorded'); } }
+    finally { rec1.disabled = false; stop1.disabled = true; }
+  };
+  send1.onclick = async () => {
+    if (!blob1) return alert('Please record first.');
+    const phrase = (document.getElementById('phrase')?.value || '').trim();
+    const lang = document.getElementById('lang1')?.value || 'en-US';
+    const fd = new FormData(); fd.append('phrase', phrase); fd.append('language', lang); fd.append('audio', blob1, 'audio.webm');
+    setStatus(1,'uploading...');
+    try {
+      const json = await postForm(ENDPOINT_PHRASE, fd);
+      localStorage.setItem('lastResult', JSON.stringify(json));
+      window.location.href = '/report'; // auto-redirect
+    } catch (e) { console.error(e); setStatus(1,'error'); alert(`Scoring failed:\n${e.message}`); }
+  };
+
+  // Course B
+  rec2.onclick = async () => {
+    if (!ensureMediaSupport()) return;
+    chunks2 = [];
+    try {
+      const s = await getStream();
+      mediaRecorder2 = setupRecorder(s, 2);
+      mediaRecorder2.start();
+      setStatus(2, 'recording (max ~60s)...');
+      rec2.disabled = true; stop2.disabled = false;
+      setTimeout(() => { try { if (mediaRecorder2 && mediaRecorder2.state !== 'inactive') { mediaRecorder2.stop(); setStatus(2,'auto-stopped'); rec2.disabled=false; stop2.disabled=true; } } catch {} }, 65000);
+    } catch (e) { console.error(e); setStatus(2,'mic blocked'); alert('Allow microphone in the address bar.'); }
+  };
+  stop2.onclick = () => {
+    try { if (mediaRecorder2 && mediaRecorder2.state !== 'inactive') { mediaRecorder2.stop(); setStatus(2,'recorded'); } }
+    finally { rec2.disabled = false; stop2.disabled = true; }
+  };
+  send2.onclick = async () => {
+    if (!blob2) return alert('Please record first.');
+    const lang = document.getElementById('lang2')?.value || 'en-US';
+    const fd = new FormData(); fd.append('language', lang); fd.append('audio', blob2, 'audio.webm');
+    setStatus(2,'uploading...');
+    try {
+      const json = await postForm(ENDPOINT_PROMPT, fd);
+      localStorage.setItem('lastResult', JSON.stringify(json));
+      window.location.href = '/report'; // auto-redirect
+    } catch (e) { console.error(e); setStatus(2,'error'); alert(`Upload/scoring failed:\n${e.message}`); }
+  };
 });
-
-btnStop?.addEventListener('click', () => {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
-  }
-  stopTimer();
-  btnStart.disabled = false;
-  btnStop.disabled = true;
-});
-
-function startTimer() {
-  startTime = Date.now();
-  stopTime = 0;
-  timerInterval = setInterval(() => {
-    const s = Math.floor((Date.now() - startTime) / 1000);
-    const mm = String(Math.floor(s / 60)).padStart(2, '0');
-    const ss = String(s % 60).padStart(2, '0');
-    timer.textContent = `${mm}:${ss}`;
-  }, 200);
-}
-
-function stopTimer() {
-  clearInterval(timerInterval);
-  stopTime = Date.now();
-  lastDurationSec = Math.max(1, Math.floor((stopTime - startTime) / 1000));
-}
-
-async function onStopRecording() {
-  try {
-    const blob = new Blob(chunks, { type: 'audio/webm' });
-    player.src = URL.createObjectURL(blob);
-    uploadStatus.textContent = 'Uploading...';
-
-    const form = new FormData();
-    form.append('audio', blob, `recording-${Date.now()}.webm`);
-    form.append('duration', String(lastDurationSec || parseTimerToSeconds()));
-
-    const resp = await fetch('/upload', { method: 'POST', body: form });
-    const data = await resp.json();
-
-    if (!resp.ok || !data.ok) {
-      uploadStatus.textContent = 'Upload failed: ' + (data.error || resp.statusText || 'Unknown error');
-      return;
-    }
-
-    uploadStatus.textContent = `Uploaded: ${data.file_id} (${data.duration_sec || lastDurationSec}s)`;
-    fileIdEl.value = data.file_id;
-
-    if (data.transcript) {
-      transcriptEl.value = data.transcript;
-    } else if (data.transcript_error) {
-      console.warn('Transcription error:', data.transcript_error);
-    }
-  } catch (err) {
-    console.error(err);
-    uploadStatus.textContent = 'Upload failed.';
-  }
-}
-
-btnAnalyze?.addEventListener('click', async () => {
-  try {
-    const durationSec = getDurationSec();
-    const form = new FormData();
-    form.append('transcript', transcriptEl.value || '');
-    form.append('duration', String(durationSec));
-
-    const resp = await fetch('/analyze', { method: 'POST', body: form });
-    const data = await resp.json();
-
-    if (!resp.ok || !data.ok) {
-      reportEl.textContent = 'Analyze failed: ' + (data.error || resp.statusText || 'Unknown');
-      return;
-    }
-
-    const lines = [
-      `Words: ${data.word_count}`,
-      `Duration: ${data.duration_sec}s`,
-      `WPM: ${data.wpm}`,
-      `Filler words: ${data.filler_count}`
-    ];
-    reportEl.textContent = lines.join('\n');
-  } catch (err) {
-    console.error(err);
-    reportEl.textContent = 'Analyze failed.';
-  }
-});
-
-btnAI?.addEventListener('click', async () => {
-  try {
-    const transcript = (transcriptEl.value || '').trim();
-    const durationSec = getDurationSec();
-    if (!transcript) {
-      aiOut.textContent = 'Please generate or paste a transcript first.';
-      return;
-    }
-    if (!durationSec || durationSec <= 0) {
-      aiOut.textContent = 'Recording duration is missing or invalid.';
-      return;
-    }
-
-    aiOut.textContent = 'Getting AI feedback...';
-
-    const payload = {
-      transcript,
-      durationSec,
-      phrases: (window.COURSE_A && window.COURSE_A.phrases) || [],
-      rubric: (window.COURSE_A && window.COURSE_A.rubric) || []
-    };
-
-    const resp = await fetch('/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await resp.json();
-    if (!resp.ok) {
-      aiOut.textContent = 'AI error: ' + (data.error || resp.statusText || 'Unknown');
-      return;
-    }
-
-    const stats = [
-      `Model: ${data.model}`,
-      `Words: ${data.word_count}`,
-      `Duration: ${data.duration_sec}s`,
-      `WPM: ${data.wpm}`,
-      `Fillers: ${formatFillers(data.fillers)}`
-    ].join('\n');
-
-    aiOut.textContent = `${stats}\n\n=== Feedback ===\n${data.feedback}`;
-  } catch (err) {
-    console.error(err);
-    aiOut.textContent = 'AI error: ' + err.message;
-  }
-});
-
-function parseTimerToSeconds() {
-  const parts = (timer.textContent || '').split(':').map(Number);
-  if (parts.length === 2 && !Number.isNaN(parts[0]) && !Number.isNaN(parts[1])) {
-    return (parts[0] * 60 + parts[1]) || 0;
-  }
-  return 0;
-}
-
-function getDurationSec() {
-  return lastDurationSec || parseTimerToSeconds() || 0;
-}
-
-function formatFillers(obj) {
-  if (!obj || typeof obj !== 'object') return 'n/a';
-  const entries = Object.entries(obj).filter(([, v]) => v > 0);
-  if (!entries.length) return 'none';
-  return entries.map(([k, v]) => `${k}:${v}`).join(', ');
-}

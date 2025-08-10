@@ -1,63 +1,171 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>MVP Speaking — Course A</title>
-  <link rel="stylesheet" href="/static/styles.css"/>
+  <meta charset="UTF-8">
+  <title>MVP Speaking App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --brand-bg:#0b132b; --brand-primary:#1c7ed6; --brand-accent:#f59e0b;
+      --card:#ffffff; --text:#0f172a; --muted:#64748b; --border:#e5e7eb;
+      --bad:#dc2626; --warn:#f59e0b; --good:#16a34a;
+    }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#f6f7fb;color:var(--text)}
+    header{background:var(--brand-bg);color:#fff;padding:16px;display:flex;align-items:center;justify-content:space-between}
+    header h1{font-size:18px;margin:0} header a{color:#fff;text-decoration:none;opacity:.9}
+    .wrap{max-width:1000px;margin:18px auto;padding:0 16px}
+    .grid{display:grid;gap:16px;grid-template-columns:1fr 1fr}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+    .section-title{font-weight:700;margin:0 0 8px}
+    .muted{color:var(--muted);font-size:13px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    input,select,button{border:1px solid var(--border);border-radius:10px;padding:10px}
+    input,select{width:100%;max-width:100%}
+    button{background:#fff;cursor:pointer}
+    button.primary{background:var(--brand-primary);color:#fff;border-color:transparent}
+    button.warn{background:var(--brand-accent);color:#111;border-color:transparent}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    audio{display:block;margin-top:8px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    @media (max-width:480px){header h1{font-size:16px}}
+  </style>
 </head>
 <body>
-  <header class="wrap">
-    <h1>MVP Speaking — Course A</h1>
-    <p class="sub">Record • Practice Phrases • Get WPM • See Rubric • AI Feedback</p>
+  <header>
+    <h1>MakoStars • Speaking Practice (MVP)</h1>
+    <a href="/report">View Last Report →</a>
   </header>
 
-  <main class="wrap">
+  <div class="wrap">
+    <!-- Course A -->
     <section class="card">
-      <h2>1) Record</h2>
+      <h2 class="section-title">Course A — Phrase Practice</h2>
+      <p class="muted">Choose a benchmark phrase (or randomize), record, and get pronunciation scores.</p>
+
+      <!-- Phrase rotation controls -->
       <div class="row">
-        <button id="btnStart">Start</button>
-        <button id="btnStop" disabled>Stop</button>
-        <div id="timer">00:00</div>
+        <select id="phraseSelect" aria-label="Benchmark phrase" style="flex:1 1 320px; min-width:260px"></select>
+        <button id="randomBtn" type="button" title="Randomize" class="warn">🎲 Random</button>
       </div>
-      <audio id="player" controls></audio>
-      <div id="uploadStatus" class="muted"></div>
-    </section>
 
-    <section class="card">
-      <h2>2) Transcript</h2>
-      <textarea id="transcript" rows="8" placeholder="Transcript will appear here (or paste your own)..."></textarea>
-      <input type="hidden" id="fileId"/>
-      <div class="row">
-        <button id="btnAnalyze">Analyze (WPM)</button>
+      <!-- The value actually sent to backend -->
+      <div style="margin-top:8px">
+        <label for="phrase" class="muted">Selected phrase (editable)</label>
+        <input id="phrase" type="text" value="">
       </div>
-      <pre id="report"></pre>
+
+      <div class="row" style="margin-top:10px">
+        <label class="muted" for="lang1">Language:</label>
+        <select id="lang1">
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+        </select>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button id="rec1" class="primary">Record</button>
+        <button id="stop1" disabled>Stop</button>
+        <button id="send1" disabled>Send</button>
+        <span id="status1" class="muted"></span>
+      </div>
+      <audio id="audio1" controls></audio>
+
+      <h4 class="section-title" style="margin-top:14px">Result</h4>
+      <div id="scores1" class="row"></div>
+      <div id="scores1_note" class="muted" style="margin-top:4px;"></div>
+      <div id="recognized1" class="muted"></div>
+      <div id="words1"></div>
     </section>
 
+    <!-- Course B -->
     <section class="card">
-      <h2>3) Course A Phrases</h2>
-      <ul id="phrases"></ul>
+      <h2 class="section-title">Course B — Prompt Response</h2>
+      <p class="muted">Answer the prompt with a 30–60 second spoken reply. We’ll auto‑transcribe and assess.</p>
+      <p><em>Prompt:</em> Describe your favorite holiday and explain why you enjoy it.</p>
+
+      <div class="row" style="margin-top:10px">
+        <label class="muted" for="lang2">Language:</label>
+        <select id="lang2">
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+        </select>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button id="rec2" class="primary">Record</button>
+        <button id="stop2" disabled>Stop</button>
+        <button id="send2" disabled>Send</button>
+        <span id="status2" class="muted"></span>
+      </div>
+      <audio id="audio2" controls></audio>
+
+      <h4 class="section-title" style="margin-top:14px">Result</h4>
+      <div id="scores2" class="row"></div>
+      <div id="scores2_note" class="muted" style="margin-top:4px;"></div>
+      <div id="recognized2" class="muted"></div>
+      <div id="transcript2" class="muted"></div>
+      <div id="words2"></div>
     </section>
+  </div>
 
-    <section class="card">
-      <h2>4) Rubric</h2>
-      <div id="rubric" class="rubric"></div>
-    </section>
+  <!-- Cache-busted JS -->
+  <script src="{{ url_for('static', filename='recorder.js') }}?v=2025-08-09-4"></script>
 
-    <section class="card">
-      <h2>5) AI Feedback (uses your server's OpenAI key)</h2>
-      <button id="btnAI">Get AI Feedback</button>
-      <pre id="aiOut" style="white-space:pre-wrap;"></pre>
-    </section>
-  </main>
-
-  <footer class="wrap muted">
-    <small>Uploads are stored temporarily on the server. Edit <code>course_a.json</code> to customize phrases & rubric.</small>
-  </footer>
-
+  <!-- Phrase rotation JS -->
   <script>
-    window.COURSE_A = {{ course_a | tojson }};
+    (function(){
+      // Rotation set: pangram + conversational + academic + TH/phoneme focus
+      const phrases = [
+        {
+          id: 'pangram',
+          label: 'Pangram (broad coverage)',
+          text: 'The quick brown fox jumps over the lazy dog in the bright sunlight.'
+        },
+        {
+          id: 'conversational',
+          label: 'Conversational (EFL-friendly)',
+          text: 'I really enjoy reading books and talking with friends on sunny afternoons.'
+        },
+        {
+          id: 'academic',
+          label: 'Academic/IELTS tone',
+          text: 'Globalization significantly influences education, employment, and cultural exchange.'
+        },
+        {
+          id: 'th-contrast',
+          label: 'Th /r/ /l/ focus',
+          text: 'These thin threads are really harder than they look.'
+        }
+      ];
+
+      const sel = document.getElementById('phraseSelect');
+      const input = document.getElementById('phrase');
+      const randBtn = document.getElementById('randomBtn');
+
+      function populate(){
+        sel.innerHTML = phrases.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+        // Default to conversational (often friendliest for students)
+        sel.value = 'conversational';
+        input.value = phrases.find(p => p.id === 'conversational').text;
+      }
+
+      function setFromSelect(){
+        const chosen = phrases.find(p => p.id === sel.value);
+        if (chosen) input.value = chosen.text;
+      }
+
+      function randomize(){
+        const pick = phrases[Math.floor(Math.random() * phrases.length)];
+        sel.value = pick.id;
+        input.value = pick.text;
+      }
+
+      sel.addEventListener('change', setFromSelect);
+      randBtn.addEventListener('click', randomize);
+
+      populate();
+    })();
   </script>
-  <script src="/static/recorder.js"></script>
 </body>
 </html>

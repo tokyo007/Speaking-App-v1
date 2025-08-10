@@ -1,4 +1,7 @@
-flask>=3.0
-openai>=1.40
-werkzeug>=3.0
-gunicorn>=21.2
+flask
+flask-cors
+python-dotenv
+azure-cognitiveservices-speech
+ffmpeg-python
+pydub
+gunicorn
