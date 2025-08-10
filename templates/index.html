@@ -1,33 +1,90 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MVP Speaking App</title>
-<link rel="stylesheet" href="/static/styles.css">
-<script src="/static/recorder.js?v=2025-08-10"></script>
+  <meta charset="UTF-8" />
+  <title>MVP Speaking App — Prompt (Exam Selection)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --brand-bg:#0b132b; --brand:#1c7ed6; --accent:#f59e0b;
+      --card:#ffffff; --ink:#0f172a; --muted:#64748b; --border:#e5e7eb;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f6f7fb;color:var(--ink)}
+    header{background:var(--brand-bg);color:#fff;padding:16px;display:flex;align-items:center;justify-content:space-between}
+    header h1{margin:0;font-size:18px}
+    header a{color:#fff;text-decoration:none;opacity:.9}
+    .wrap{max-width:980px;margin:16px auto;padding:0 16px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .muted{color:var(--muted);font-size:13px}
+    label{font-size:13px;color:var(--muted)}
+    select,button{border:1px solid var(--border);border-radius:10px;padding:10px;background:#fff}
+    button.primary{background:var(--brand);color:#fff;border-color:transparent}
+    button.warn{background:var(--accent);color:#111;border-color:transparent}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    #promptBox{background:#fbfdff;border:1px solid var(--border);border-radius:12px;padding:12px}
+    audio{display:block;margin-top:8px}
+    @media (max-width:520px){
+      header h1{font-size:16px}
+      select,button{width:100%}
+    }
+  </style>
 </head>
 <body>
-<h1>Speaking App - Exam Selection</h1>
+  <header>
+    <h1>MakoStars • Speaking (Exam Prompt)</h1>
+    <a href="/report">View Last Report →</a>
+  </header>
 
-<label for="testType">Select Test:</label>
-<select id="testType"></select>
+  <main class="wrap">
+    <section class="card">
+      <h2 style="margin:0 0 6px">Course B — Prompt Response</h2>
+      <p class="muted" style="margin:0 0 12px">
+        Choose a test → group → question. Record a 30–60s answer. We’ll assess pronunciation and show your report.
+      </p>
 
-<label for="groupId">Select Group:</label>
-<select id="groupId"></select>
+      <div class="row" style="margin-bottom:8px">
+        <label for="testType">Test</label>
+        <select id="testType" aria-label="Test type"></select>
 
-<label for="questionId">Select Question:</label>
-<select id="questionId"></select>
+        <label for="groupId">Group</label>
+        <select id="groupId" aria-label="Question group"></select>
 
-<p id="promptText"></p>
+        <label for="questionId">Question</label>
+        <select id="questionId" aria-label="Question"></select>
 
-<button id="recordBtn">🎤 Record</button>
-<button id="stopBtn" disabled>⏹ Stop</button>
+        <button id="randQ" class="warn" type="button" title="Random question">🎲 Random</button>
+      </div>
 
-<div id="status"></div>
+      <div id="promptBox">
+        <div class="muted" style="margin-bottom:6px">Prompt</div>
+        <div id="promptText" style="line-height:1.5"></div>
+      </div>
 
-<script>
-initSelectors();
-</script>
+      <div class="row" style="margin-top:10px">
+        <label for="lang">Language</label>
+        <select id="lang">
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+        </select>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button id="recordBtn" class="primary" type="button">🎤 Record</button>
+        <button id="stopBtn" type="button" disabled>⏹ Stop</button>
+        <span id="status" class="muted"></span>
+      </div>
+
+      <audio id="playback" controls></audio>
+
+      <p class="muted" style="margin-top:8px">
+        Tip: If embedded in an LMS iframe, the iframe must include <code>allow="microphone"</code>.
+      </p>
+    </section>
+  </main>
+
+  <!-- Load AFTER the DOM so addEventListener finds the elements -->
+  <script src="/static/recorder.js?v=2025-08-10-3"></script>
 </body>
 </html>
