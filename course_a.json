@@ -1,0 +1,37 @@
+{
+  "title": "Course A — Everyday Speaking",
+  "phrases": [
+    "In my opinion, ...",
+    "For example, ...",
+    "I would rather ... because ...",
+    "On the one hand ... on the other hand ...",
+    "To be honest, ...",
+    "Generally speaking, ...",
+    "One challenge I faced was ...",
+    "If I had more time, I would ...",
+    "The reason is that ...",
+    "As a result, ..."
+  ],
+  "rubric": [
+    {
+      "category": "Fluency",
+      "description": "Speaks smoothly with minimal hesitation or long pauses; maintains natural pacing."
+    },
+    {
+      "category": "Pronunciation",
+      "description": "Intelligible pronunciation, stress, and rhythm; listener rarely struggles to understand."
+    },
+    {
+      "category": "Vocabulary",
+      "description": "Uses topic-appropriate and varied vocabulary; attempts paraphrasing when needed."
+    },
+    {
+      "category": "Grammar",
+      "description": "Generally accurate sentence structures; errors do not impede communication."
+    },
+    {
+      "category": "Content & Organization",
+      "description": "Clear main idea, examples, and conclusion; ideas are logically connected."
+    }
+  ]
+}

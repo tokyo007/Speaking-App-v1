@@ -1,160 +1,138 @@
-import os, json, tempfile, shlex, subprocess
-from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify
+import os
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
-import azure.cognitiveservices.speech as speechsdk
+import time, uuid, json
 
-load_dotenv()
+# Optional OpenAI imports — only used if OPENAI_API_KEY present
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+try:
+    if OPENAI_API_KEY:
+        from openai import OpenAI
+        openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    else:
+        openai_client = None
+except Exception:
+    openai_client = None
 
-SPEECH_KEY    = os.getenv("SPEECH_KEY")
-SPEECH_REGION = os.getenv("SPEECH_REGION", "japaneast")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+COURSE_A_PATH = os.path.join(BASE_DIR, "course_a.json")
+
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 30 * 1024 * 1024  # 30 MB uploads
 
-# ---------------- Utilities ----------------
-def run_cmd(cmd: str):
-    p = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return p.returncode, p.stdout.decode(errors="ignore"), p.stderr.decode(errors="ignore")
-
-def to_wav_16k_mono(src_path: str, dst_path: str):
-    cmd = f'ffmpeg -y -i "{src_path}" -ac 1 -ar 16000 -c:a pcm_s16le -f wav "{dst_path}"'
-    code, out, err = run_cmd(cmd)
-    if code != 0:
-        raise RuntimeError(f"ffmpeg failed (code {code}): {err[:4000]}")
-    if not os.path.exists(dst_path):
-        raise RuntimeError("ffmpeg did not create output file")
-    size = os.path.getsize(dst_path)
-    if size < 1000:
-        raise RuntimeError(f"wav too small: {size} bytes; ffmpeg: {err[:4000]}")
-    with open(dst_path, "rb") as f:
-        header = f.read(12)
-    if not (len(header) >= 12 and header[0:4] == b"RIFF" and header[8:12] == b"WAVE"):
-        raise RuntimeError("Invalid WAV header (not RIFF/WAVE)")
-    return dst_path
-
-def ensure_azure():
-    if not SPEECH_KEY or not SPEECH_REGION:
-        raise RuntimeError("Azure SPEECH_KEY/REGION not set")
-
-def stt_once(wav_path: str, language: str = "en-US"):
-    ensure_azure()
-    speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
-    speech_config.speech_recognition_language = language
-    audio_cfg = speechsdk.audio.AudioConfig(filename=wav_path)
-    recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_cfg)
-    result = recognizer.recognize_once()
-    if result.reason != speechsdk.ResultReason.RecognizedSpeech:
-        return {"status": "error", "message": f"STT failed: {result.reason}"}
-    return {"status": "ok", "text": result.text}
-
-def run_pronunciation_assessment(wav_path: str, reference_text: str, language: str = "en-US"):
-    ensure_azure()
-    speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
-    speech_config.speech_recognition_language = language
-    audio_cfg = speechsdk.audio.AudioConfig(filename=wav_path)
-    pa_cfg = speechsdk.PronunciationAssessmentConfig(
-        reference_text=reference_text,
-        grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
-        granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
-        enable_miscue=True
-    )
-    recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_cfg)
-    pa_cfg.apply_to(recognizer)
-    result = recognizer.recognize_once()
-    if result.reason != speechsdk.ResultReason.RecognizedSpeech:
-        return {"status": "error", "message": f"Recognition failed: {result.reason}"}
-    pa = speechsdk.PronunciationAssessmentResult(result)
-    detail = {}
+def load_course_a():
     try:
-        jr = result.properties.get(speechsdk.PropertyId.SpeechServiceResponse_JsonResult)
-        if jr:
-            detail = json.loads(jr)
+        with open(COURSE_A_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
     except Exception:
-        detail = {}
-    return {
-        "status": "ok",
-        "referenceText": reference_text,
-        "recognizedText": result.text,
-        "scores": {
-            "pronunciation": pa.pronunciation_score,
-            "accuracy":      pa.accuracy_score,
-            "fluency":       pa.fluency_score,
-            "completeness":  pa.completeness_score,
-        },
-        "detail": detail
-    }
+        return {"title":"Course A","phrases":[],"rubric":[]}
 
-# ---------------- Routes ----------------
-@app.get("/")
+@app.route("/")
 def index():
-    return render_template("index.html")
+    course_a = load_course_a()
+    return render_template("index.html", course_a=course_a, has_openai=bool(openai_client))
 
-@app.get("/report")
-def report():
-    return render_template("report.html")
+@app.route("/static/<path:path>")
+def send_static(path):
+    return send_from_directory(os.path.join(BASE_DIR, "static"), path)
 
-@app.get("/health")
-def health():
-    return jsonify({"ok": True, "commit": os.getenv("RENDER_GIT_COMMIT", "")}), 200
+@app.route("/upload", methods=["POST"])
+def upload():
+    """
+    Accepts audio Blob under 'audio' field. Returns file_id and (optional) transcript using Whisper.
+    Client also sends 'duration' (seconds) captured during recording.
+    """
+    if "audio" not in request.files:
+        return jsonify({"ok": False, "error": "No audio file"}), 400
 
-@app.post("/assess_phrase")
-def assess_phrase():
+    file = request.files["audio"]
+    filename = secure_filename(file.filename) or f"recording-{uuid.uuid4().hex}.webm"
+    save_path = os.path.join(UPLOAD_DIR, filename)
+    file.save(save_path)
+
+    duration = float(request.form.get("duration", "0"))
+    result = {"ok": True, "file_id": filename, "duration": duration}
+
+    # If OpenAI is configured, try Whisper transcription
+    if openai_client:
+        try:
+            with open(save_path, "rb") as af:
+                transcription = openai_client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=af,
+                    response_format="text"
+                )
+            result["transcript"] = transcription
+        except Exception as e:
+            result["transcript_error"] = str(e)
+
+    return jsonify(result), 200
+
+@app.route("/ai-feedback", methods=["POST"])
+def ai_feedback():
+    """
+    Provide AI feedback using GPT, referencing the rubric, transcript, and WPM stats.
+    """
+    if not openai_client:
+        return jsonify({"ok": False, "error": "OPENAI_API_KEY not set"}), 400
+
+    data = request.get_json(force=True)
+    transcript = data.get("transcript", "").strip()
+    rubric = data.get("rubric", [])
+    wpm = data.get("wpm", 0)
+    target_phrases = data.get("phrases", [])
+
+    prompt = (
+        "You are an ESL speaking evaluator. Score and comment concisely using the rubric. "
+        "Return JSON with fields: overall_comments, strengths[], areas_to_improve[], "
+        "scores (dict of category->1-5), and phrase_hits (phrases the student used). "
+        f"\nRubric: {json.dumps(rubric, ensure_ascii=False)}"
+        f"\nTarget phrases: {json.dumps(target_phrases, ensure_ascii=False)}"
+        f"\nWPM: {wpm}"
+        f"\nTranscript: {transcript}\n"
+    )
+
     try:
-        phrase   = (request.form.get("phrase") or "").strip()
-        language = (request.form.get("language") or "en-US").strip()
-        f = request.files.get("audio")
-        if not phrase:
-            return jsonify({"status": "error", "message": "Missing 'phrase'"}), 400
-        if not f:
-            return jsonify({"status": "error", "message": "Missing 'audio' file"}), 400
-        with tempfile.TemporaryDirectory() as td:
-            src_path = os.path.join(td, secure_filename(f.filename or "audio.webm"))
-            f.save(src_path)
-            wav_path = os.path.join(td, "audio.wav")
-            try:
-                to_wav_16k_mono(src_path, wav_path)
-            except Exception as e:
-                return jsonify({"status": "error", "message": "Audio conversion failed", "raw": str(e)}), 400
-            result = run_pronunciation_assessment(wav_path, phrase, language=language)
-            return jsonify(result), (200 if result.get("status") == "ok" else 400)
+        completion = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+        )
+        content = completion.choices[0].message.content
+        try:
+            parsed = json.loads(content)
+        except Exception:
+            parsed = {"overall_comments": content, "raw": content}
+        return jsonify({"ok": True, "feedback": parsed})
     except Exception as e:
-        return jsonify({"status": "error", "message": "Server error", "raw": str(e)}), 500
+        return jsonify({"ok": False, "error": str(e)}), 500
 
-@app.post("/assess_prompt")
-def assess_prompt():
-    try:
-        language = (request.form.get("language") or "en-US").strip()
-        meta = {
-            "testType":   request.form.get("testType")   or "",
-            "groupId":    request.form.get("groupId")    or "",
-            "questionId": request.form.get("questionId") or "",
-            "promptText": request.form.get("promptText") or "",
-        }
-        f = request.files.get("audio")
-        if not f:
-            return jsonify({"status": "error", "message": "Missing 'audio' file"}), 400
-        with tempfile.TemporaryDirectory() as td:
-            src_path = os.path.join(td, secure_filename(f.filename or "audio.webm"))
-            f.save(src_path)
-            wav_path = os.path.join(td, "audio.wav")
-            try:
-                to_wav_16k_mono(src_path, wav_path)
-            except Exception as e:
-                return jsonify({"status": "error", "message": "Audio conversion failed", "raw": str(e)}), 400
-            stt = stt_once(wav_path, language=language)
-            if stt.get("status") != "ok":
-                return jsonify(stt), 400
-            transcript = stt["text"] or "(no speech detected)"
-            pa = run_pronunciation_assessment(wav_path, transcript, language=language)
-            if pa.get("status") != "ok":
-                return jsonify(pa), 400
-            pa["transcriptUsedAsReference"] = transcript
-            pa["meta"] = meta
-            return jsonify(pa), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": "Server error", "raw": str(e)}), 500
+@app.route("/uploads/<path:fname>")
+def get_upload(fname):
+    return send_from_directory(UPLOAD_DIR, fname)
 
-# ---------------- Entrypoint ----------------
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT","5000")), debug=False)
+@app.route("/analyze", methods=["POST"])
+def analyze():
+    """
+    Accept text transcript + duration, compute WPM, basic stats.
+    """
+    text = request.form.get("transcript", "").strip()
+    duration = float(request.form.get("duration", "0"))  # seconds
+
+    words = [w for w in text.replace("\n"," ").split(" ") if w.strip()]
+    word_count = len(words)
+    minutes = duration / 60.0 if duration > 0 else 0.000001
+    wpm = word_count / minutes
+
+    filler_words = ["um","uh","like","you know","er","ah"]
+    filler_count = sum(text.lower().count(fw) for fw in filler_words)
+
+    return jsonify({
+        "ok": True,
+        "word_count": word_count,
+        "duration_sec": duration,
+        "wpm": round(wpm, 1),
+        "filler_count": filler_count
+    })
