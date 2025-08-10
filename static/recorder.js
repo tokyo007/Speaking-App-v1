@@ -1,236 +1,144 @@
-'use strict';
+let mediaRecorder, chunks=[], startTime=0, timerInterval=null;
+const btnStart = document.getElementById('btnStart');
+const btnStop = document.getElementById('btnStop');
+const timer = document.getElementById('timer');
+const player = document.getElementById('player');
+const uploadStatus = document.getElementById('uploadStatus');
+const transcriptEl = document.getElementById('transcript');
+const reportEl = document.getElementById('report');
+const fileIdEl = document.getElementById('fileId');
+const btnAnalyze = document.getElementById('btnAnalyze');
+const aiBlock = document.getElementById('aiBlock');
+const btnAI = document.getElementById('btnAI');
 
-/**
- * This file:
- * - Populates Test → Group → Question selectors from TEST_BANK
- * - Records audio with MediaRecorder
- * - Uploads to /assess_prompt with metadata (testType, groupId, questionId, promptText, language)
- * - Saves JSON to localStorage.lastResult and redirects to /report
- */
+(function renderCourse(){
+  const phrasesUl = document.getElementById('phrases');
+  const rubricDiv = document.getElementById('rubric');
+  const data = window.COURSE_A || {phrases:[], rubric:[]};
+  data.phrases.forEach(p => {
+    const li = document.createElement('li');
+    li.textContent = p;
+    phrasesUl.appendChild(li);
+  });
+  data.rubric.forEach(r => {
+    const d = document.createElement('div');
+    d.className = 'rubric-item';
+    const h = document.createElement('h4'); h.textContent = r.category;
+    const p = document.createElement('p'); p.textContent = r.description;
+    d.appendChild(h); d.appendChild(p);
+    rubricDiv.appendChild(d);
+  });
+})();
 
-// --- Minimal test bank (add as many groups/questions as you like) ---
-const TEST_BANK = {
-  IELTS: {
-    1: [
-      'What do you usually do in your free time?',
-      'Do you prefer to spend your free time alone or with others? Why?'
-    ],
-    2: [
-      'Describe a memorable trip you took. Say where you went, who you went with, and why it was memorable.'
-    ],
-    3: [
-      'How has tourism changed in your country over the last 20 years?'
-    ]
-  },
-  EIKEN: {
-    1: [
-      'What is your favorite subject at school? Please tell me why.',
-      'Do you prefer studying alone or with friends? Please explain.'
-    ],
-    2: [
-      'Do you think students should use smartphones in class? Why or why not?'
-    ],
-    3: [
-      'What are some ways to protect the environment in your community?'
-    ]
-  },
-  TOEFL: {
-    1: [
-      'Some people prefer studying in the morning, others at night. Which do you prefer and why?'
-    ],
-    2: [
-      'Summarize an announcement from a university and give your opinion.'
-    ]
-  },
-  DET: {
-    1: [
-      'Describe a photo of a busy city street to someone who cannot see it.'
-    ],
-    2: [
-      'Do you agree or disagree that social media has improved communication? Explain your reasons.'
-    ]
-  }
+btnStart.onclick = async () => {
+  chunks = [];
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  mediaRecorder = new MediaRecorder(stream);
+  mediaRecorder.ondataavailable = e => chunks.push(e.data);
+  mediaRecorder.onstop = onStopRecording;
+  mediaRecorder.start();
+  startTimer();
+  btnStart.disabled = true;
+  btnStop.disabled = false;
 };
 
-// --- DOM refs (assigned after DOMContentLoaded) ---
-let testSel, groupSel, qSel, promptEl, randBtn, statusEl, langSel, recBtn, stopBtn, playback;
-
-// --- MediaRecorder state ---
-let mediaRecorder = null;
-let chunks = [];
-let blob = null;
-
-// --------------- UI helpers ---------------
-function setStatus(msg) {
-  if (statusEl) statusEl.textContent = msg || '';
-}
-function ensureMediaSupport() {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    alert('Your browser does not support microphone access. Use Chrome/Edge.');
-    return false;
+btnStop.onclick = () => {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
   }
-  if (typeof MediaRecorder === 'undefined') {
-    alert('MediaRecorder is not available. Use Chrome/Edge.');
-    return false;
+  stopTimer();
+  btnStart.disabled = false;
+  btnStop.disabled = true;
+};
+
+function startTimer(){
+  startTime = Date.now();
+  timerInterval = setInterval(()=>{
+    const s = Math.floor((Date.now()-startTime)/1000);
+    const mm = String(Math.floor(s/60)).padStart(2,'0');
+    const ss = String(s%60).padStart(2,'0');
+    timer.textContent = `${mm}:${ss}`;
+  }, 200);
+}
+function stopTimer(){
+  clearInterval(timerInterval);
+}
+
+async function onStopRecording(){
+  const blob = new Blob(chunks, { type: 'audio/webm' });
+  player.src = URL.createObjectURL(blob);
+  uploadStatus.textContent = 'Uploading...';
+  const form = new FormData();
+  form.append('audio', blob, `recording-${Date.now()}.webm`);
+  const durationSec = Math.floor((Date.now()-startTime)/1000);
+  form.append('duration', String(durationSec));
+
+  const resp = await fetch('/upload', { method:'POST', body: form });
+  const data = await resp.json();
+  if(!data.ok){
+    uploadStatus.textContent = 'Upload failed: '+(data.error||'Unknown error');
+    return;
   }
-  return true;
+  uploadStatus.textContent = `Uploaded: ${data.file_id} (${durationSec}s)`;
+  fileIdEl.value = data.file_id;
+  if (data.transcript){
+    transcriptEl.value = data.transcript;
+  } else if (data.transcript_error){
+    console.warn('Transcription error:', data.transcript_error);
+  }
 }
 
-// --------------- Selectors logic ---------------
-function fillTests() {
-  const tests = Object.keys(TEST_BANK);
-  testSel.innerHTML = tests.map(t => `<option value="${t}">${t}</option>`).join('');
-}
-function fillGroups() {
-  const groups = TEST_BANK[testSel.value] || {};
-  const keys = Object.keys(groups);
-  groupSel.innerHTML = keys.map(k => `<option value="${k}">Group ${k}</option>`).join('');
-}
-function fillQuestions() {
-  const qs = (TEST_BANK[testSel.value] || {})[groupSel.value] || [];
-  qSel.innerHTML = qs.map((q, i) => `<option value="${i}">Q${i + 1}</option>`).join('');
-}
-function setPromptFromSelection() {
-  const qs = (TEST_BANK[testSel.value] || {})[groupSel.value] || [];
-  const q = qs[parseInt(qSel.value || '0', 10)] || '';
-  promptEl.textContent = q;
-  // remember choices
-  localStorage.setItem('lastTestSel', testSel.value);
-  localStorage.setItem('lastGroupSel', groupSel.value);
-  localStorage.setItem('lastQSel', qSel.value);
-}
-function randomizeQuestion() {
-  const groups = TEST_BANK[testSel.value] || {};
-  const gKeys = Object.keys(groups);
-  if (!gKeys.length) return;
-  const gKey = gKeys[Math.floor(Math.random() * gKeys.length)];
-  const qs = groups[gKey];
-  const idx = Math.floor(Math.random() * qs.length);
+btnAnalyze.onclick = async () => {
+  const durationSec = parseTimerToSeconds();
+  const form = new FormData();
+  form.append('transcript', transcriptEl.value || '');
+  form.append('duration', String(durationSec));
+  const resp = await fetch('/analyze', { method:'POST', body: form });
+  const data = await resp.json();
+  if(!data.ok){
+    reportEl.textContent = 'Analyze failed';
+    return;
+  }
+  const lines = [
+    `Words: ${data.word_count}`,
+    `Duration: ${data.duration_sec}s`,
+    `WPM: ${data.wpm}`,
+    `Filler words: ${data.filler_count}`
+  ];
+  reportEl.textContent = lines.join('\n');
+};
 
-  groupSel.value = gKey;
-  fillQuestions();
-  qSel.value = String(idx);
-  setPromptFromSelection();
+function parseTimerToSeconds(){
+  const [mm, ss] = timer.textContent.split(':').map(Number);
+  return (mm*60+ss)||0;
 }
 
-// --------------- Recording ---------------
-async function startRecording() {
-  if (!ensureMediaSupport()) return;
-  chunks = [];
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : undefined;
-    mediaRecorder = new MediaRecorder(stream, mimeType);
-    mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
-    mediaRecorder.onstop = () => {
-      blob = new Blob(chunks, { type: 'audio/webm' });
-      // preview
-      const url = URL.createObjectURL(blob);
-      if (playback) playback.src = url;
-      // auto-upload after recording stops
-      uploadRecording().catch(err => {
-        console.error(err);
-        setStatus('Upload/scoring failed: ' + err.message);
+if (aiBlock && aiBlock.dataset.hasOpenai==='true'){
+  if (btnAI){
+    btnAI.onclick = async () => {
+      const durationSec = parseTimerToSeconds();
+      const minutes = Math.max(durationSec/60, 0.000001);
+      const words = (transcriptEl.value||'').split(/\s+/).filter(Boolean).length;
+      const wpm = words/minutes;
+
+      const payload = {
+        transcript: transcriptEl.value||'',
+        rubric: (window.COURSE_A && window.COURSE_A.rubric) || [],
+        phrases: (window.COURSE_A && window.COURSE_A.phrases) || [],
+        wpm: Number(wpm.toFixed(1))
+      };
+      const resp = await fetch('/ai-feedback', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
       });
+      const data = await resp.json();
+      const out = document.getElementById('aiOut');
+      if(!data.ok){
+        out.textContent = 'AI error: ' + (data.error || 'Unknown');
+        return;
+      }
+      out.textContent = JSON.stringify(data.feedback, null, 2);
     };
-    mediaRecorder.start();
-    setStatus('Recording… (auto-stops ~65s)');
-    recBtn.disabled = true;
-    stopBtn.disabled = false;
-
-    // safety auto-stop
-    setTimeout(() => {
-      try {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-          mediaRecorder.stop();
-          setStatus('Auto-stopped. Uploading…');
-          recBtn.disabled = false;
-          stopBtn.disabled = true;
-        }
-      } catch {}
-    }, 65000);
-  } catch (e) {
-    console.error('Mic error:', e);
-    setStatus('Microphone blocked. Please allow access in the address bar.');
-    alert('Please allow microphone access.');
   }
 }
-
-function stopRecording() {
-  try {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-      setStatus('Stopped. Uploading…');
-    }
-  } finally {
-    recBtn.disabled = false;
-    stopBtn.disabled = true;
-  }
-}
-
-// --------------- Upload ---------------
-async function uploadRecording() {
-  if (!blob) {
-    setStatus('No audio captured. Try again.');
-    return;
-  }
-  const fd = new FormData();
-  fd.append('language', (langSel?.value || 'en-US'));
-  fd.append('audio', blob, 'audio.webm');
-  fd.append('testType', testSel?.value || '');
-  fd.append('groupId', groupSel?.value || '');
-  fd.append('questionId', qSel?.value || '');
-  fd.append('promptText', promptEl?.textContent || '');
-
-  const res = await fetch('/assess_prompt', { method: 'POST', body: fd });
-  let json;
-  try { json = await res.json(); } catch { throw new Error(`Non-JSON response (${res.status})`); }
-  if (!res.ok || json?.status === 'error') {
-    throw new Error(json?.message || `Request failed (${res.status})`);
-  }
-  localStorage.setItem('lastResult', JSON.stringify(json));
-  window.location.href = '/report';
-}
-
-// --------------- Boot ---------------
-document.addEventListener('DOMContentLoaded', () => {
-  // Grab elements
-  testSel   = document.getElementById('testType');
-  groupSel  = document.getElementById('groupId');
-  qSel      = document.getElementById('questionId');
-  promptEl  = document.getElementById('promptText');
-  randBtn   = document.getElementById('randQ');
-  statusEl  = document.getElementById('status');
-  langSel   = document.getElementById('lang');
-  recBtn    = document.getElementById('recordBtn');
-  stopBtn   = document.getElementById('stopBtn');
-  playback  = document.getElementById('playback');
-
-  if (!testSel || !groupSel || !qSel || !promptEl || !recBtn || !stopBtn) {
-    console.error('Missing required DOM elements. Check IDs.');
-    return;
-  }
-
-  // Populate selects
-  fillTests();
-  // Restore last selection if available
-  const lastTest  = localStorage.getItem('lastTestSel');
-  if (lastTest && TEST_BANK[lastTest]) testSel.value = lastTest;
-  fillGroups();
-  const lastGroup = localStorage.getItem('lastGroupSel');
-  if (lastGroup && (TEST_BANK[testSel.value] || {})[lastGroup]) groupSel.value = lastGroup;
-  fillQuestions();
-  const lastQ     = localStorage.getItem('lastQSel');
-  if (lastQ) qSel.value = lastQ;
-  setPromptFromSelection();
-
-  // Wire events
-  testSel.addEventListener('change', () => { fillGroups(); fillQuestions(); setPromptFromSelection(); });
-  groupSel.addEventListener('change', () => { fillQuestions(); setPromptFromSelection(); });
-  qSel.addEventListener('change', setPromptFromSelection);
-  if (randBtn) randBtn.addEventListener('click', randomizeQuestion);
-  recBtn.addEventListener('click', startRecording);
-  stopBtn.addEventListener('click', stopRecording);
-
-  console.log('recorder.js wired:', typeof startRecording, typeof stopRecording);
-});
