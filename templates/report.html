@@ -10,7 +10,7 @@
     .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin:12px 0}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .pill{border:1px solid #e5e7eb;border-radius:999px;padding:4px 10px;background:#f8fafc}
-    .muted{color:#64748b}
+    .muted{color:#334155}
     .badge{display:inline-block;margin-right:6px;padding:2px 8px;border-radius:6px;background:#f1f5f9}
     .badge.good{background:#ecfdf5}
     .badge.warn{background:#fff7ed}
@@ -34,7 +34,7 @@
 
     <section class="card">
       <div id="badges"></div>
-      <div id="estimates" class="muted" style="margin-top:8px"></div>
+      <div id="estimates" style="margin-top:8px"></div>
       <div id="rubric" class="muted" style="margin-top:8px; padding-left:10px; border-left:4px solid #e5e7eb"></div>
     </section>
 
@@ -59,11 +59,11 @@
     </section>
 
     <div class="row" style="justify-content:flex-end; gap:8px">
-      <button id="btnPdf" class="pill" disabled>Download PDF</button>
-      <button class="pill" onclick="downloadJSON()">Download JSON</button>
+      <button type="button" id="btnPdf" class="pill" disabled>Download PDF</button>
+      <button type="button" class="pill" onclick="downloadJSON()">Download JSON</button>
     </div>
   </div>
 
-  <script src="/static/report.js?v=auto-report-3"></script>
+  <script src="/static/report.js?v=auto-report-5"></script>
 </body>
 </html>

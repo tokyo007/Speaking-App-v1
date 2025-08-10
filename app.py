@@ -174,6 +174,7 @@ def assess_phrase():
         transcript = result.get("recognizedText") or ""
         m = metrics_from_transcript(transcript or phrase, dur)
         result["metrics"] = m
+        ensure_metrics_nonzero(result, dur)
         rid = persist_result({"mode":"phrase","language":language,"referenceText":phrase,"result":result})
         result["result_id"] = rid
         result["pdf_url"] = url_for("report_pdf", result_id=rid, _external=False)
@@ -206,6 +207,7 @@ def assess_prompt():
 
         m = metrics_from_transcript(transcript, dur)
         pa["metrics"] = m
+        ensure_metrics_nonzero(pa, dur)
         rid = persist_result({"mode":"prompt","language":language,"result":pa})
         pa["result_id"] = rid
         pa["pdf_url"] = url_for("report_pdf", result_id=rid, _external=False)
@@ -286,3 +288,14 @@ def health():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT","5000")), debug=False)
+
+
+def ensure_metrics_nonzero(res_obj, duration_sec):
+    """If metrics.word_count is 0, recompute using the best available text."""
+    m = res_obj.get("metrics") or {}
+    if m.get("word_count", 0) > 0:
+        return m
+    text = res_obj.get("recognizedText") or res_obj.get("referenceText") or res_obj.get("transcriptUsedAsReference") or ""
+    newm = metrics_from_transcript(text, duration_sec)
+    res_obj["metrics"] = newm
+    return newm

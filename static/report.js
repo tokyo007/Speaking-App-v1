@@ -55,7 +55,7 @@ function wordsTable(words){
   return `<table><thead><tr><th>Word</th><th>Accuracy</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 function getResult(){
-  try{ const raw = localStorage.getItem('lastResult'); return raw? JSON.parse(raw) : null; }catch{ return null; }
+  try{ const raw = localStorage.getItem('lastResult') || localStorage.getItem('__ASSESSMENT__'); return raw? JSON.parse(raw) : null; }catch{ return null; }
 }
 function downloadJSON(){
   const data = getResult(); if(!data){ alert('No report data.'); return; }
