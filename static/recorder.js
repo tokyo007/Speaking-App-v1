@@ -9,32 +9,37 @@ const transcriptEl = document.getElementById('transcript');
 const reportEl = document.getElementById('report');
 const fileIdEl = document.getElementById('fileId');
 const btnAnalyze = document.getElementById('btnAnalyze');
-const aiBlock = document.getElementById('aiBlock');
 const btnAI = document.getElementById('btnAI');
-const aiOut = document.getElementById('aiOut'); // make sure this exists in HTML
+const aiOut = document.getElementById('aiOut');
 
 (function renderCourse() {
   const phrasesUl = document.getElementById('phrases');
   const rubricDiv = document.getElementById('rubric');
   const data = window.COURSE_A || { phrases: [], rubric: [] };
 
-  data.phrases.forEach(p => {
-    const li = document.createElement('li');
-    li.textContent = p;
-    phrasesUl.appendChild(li);
-  });
+  if (phrasesUl) {
+    phrasesUl.innerHTML = '';
+    data.phrases.forEach(p => {
+      const li = document.createElement('li');
+      li.textContent = p;
+      phrasesUl.appendChild(li);
+    });
+  }
 
-  data.rubric.forEach(r => {
-    const d = document.createElement('div');
-    d.className = 'rubric-item';
-    const h = document.createElement('h4'); h.textContent = r.category;
-    const p = document.createElement('p'); p.textContent = r.description;
-    d.appendChild(h); d.appendChild(p);
-    rubricDiv.appendChild(d);
-  });
+  if (rubricDiv) {
+    rubricDiv.innerHTML = '';
+    data.rubric.forEach(r => {
+      const d = document.createElement('div');
+      d.className = 'rubric-item';
+      const h = document.createElement('h4'); h.textContent = r.category;
+      const p = document.createElement('p'); p.textContent = r.description;
+      d.appendChild(h); d.appendChild(p);
+      rubricDiv.appendChild(d);
+    });
+  }
 })();
 
-btnStart.onclick = async () => {
+btnStart?.addEventListener('click', async () => {
   try {
     chunks = [];
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -52,16 +57,16 @@ btnStart.onclick = async () => {
     console.error(err);
     alert('Microphone access failed.');
   }
-};
+});
 
-btnStop.onclick = () => {
+btnStop?.addEventListener('click', () => {
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop();
   }
   stopTimer();
   btnStart.disabled = false;
   btnStop.disabled = true;
-};
+});
 
 function startTimer() {
   startTime = Date.now();
@@ -77,7 +82,7 @@ function startTimer() {
 function stopTimer() {
   clearInterval(timerInterval);
   stopTime = Date.now();
-  lastDurationSec = Math.max(1, Math.floor((stopTime - startTime) / 1000)); // avoid 0
+  lastDurationSec = Math.max(1, Math.floor((stopTime - startTime) / 1000));
 }
 
 async function onStopRecording() {
@@ -98,7 +103,7 @@ async function onStopRecording() {
       return;
     }
 
-    uploadStatus.textContent = `Uploaded: ${data.file_id} (${lastDurationSec}s)`;
+    uploadStatus.textContent = `Uploaded: ${data.file_id} (${data.duration_sec || lastDurationSec}s)`;
     fileIdEl.value = data.file_id;
 
     if (data.transcript) {
@@ -112,7 +117,7 @@ async function onStopRecording() {
   }
 }
 
-btnAnalyze.onclick = async () => {
+btnAnalyze?.addEventListener('click', async () => {
   try {
     const durationSec = getDurationSec();
     const form = new FormData();
@@ -138,7 +143,56 @@ btnAnalyze.onclick = async () => {
     console.error(err);
     reportEl.textContent = 'Analyze failed.';
   }
-};
+});
+
+btnAI?.addEventListener('click', async () => {
+  try {
+    const transcript = (transcriptEl.value || '').trim();
+    const durationSec = getDurationSec();
+    if (!transcript) {
+      aiOut.textContent = 'Please generate or paste a transcript first.';
+      return;
+    }
+    if (!durationSec || durationSec <= 0) {
+      aiOut.textContent = 'Recording duration is missing or invalid.';
+      return;
+    }
+
+    aiOut.textContent = 'Getting AI feedback...';
+
+    const payload = {
+      transcript,
+      durationSec,
+      phrases: (window.COURSE_A && window.COURSE_A.phrases) || [],
+      rubric: (window.COURSE_A && window.COURSE_A.rubric) || []
+    };
+
+    const resp = await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await resp.json();
+    if (!resp.ok) {
+      aiOut.textContent = 'AI error: ' + (data.error || resp.statusText || 'Unknown');
+      return;
+    }
+
+    const stats = [
+      `Model: ${data.model}`,
+      `Words: ${data.word_count}`,
+      `Duration: ${data.duration_sec}s`,
+      `WPM: ${data.wpm}`,
+      `Fillers: ${formatFillers(data.fillers)}`
+    ].join('\n');
+
+    aiOut.textContent = `${stats}\n\n=== Feedback ===\n${data.feedback}`;
+  } catch (err) {
+    console.error(err);
+    aiOut.textContent = 'AI error: ' + err.message;
+  }
+});
 
 function parseTimerToSeconds() {
   const parts = (timer.textContent || '').split(':').map(Number);
@@ -149,63 +203,7 @@ function parseTimerToSeconds() {
 }
 
 function getDurationSec() {
-  // Prefer the measured stop-start duration; fall back to timer text.
   return lastDurationSec || parseTimerToSeconds() || 0;
-}
-
-// === NEW: Call your backend OpenAI integration at /api/feedback ===
-if (aiBlock && btnAI) {
-  btnAI.onclick = async () => {
-    try {
-      const transcript = (transcriptEl.value || '').trim();
-      const durationSec = getDurationSec();
-
-      if (!transcript) {
-        aiOut.textContent = 'Please generate or paste a transcript first.';
-        return;
-      }
-      if (!durationSec || durationSec <= 0) {
-        aiOut.textContent = 'Recording duration is missing or invalid.';
-        return;
-      }
-
-      aiOut.textContent = 'Getting AI feedback...';
-
-      // Optional context: send phrases & rubric if you want your server to include them
-      const payload = {
-        transcript,
-        durationSec,
-        phrases: (window.COURSE_A && window.COURSE_A.phrases) || [],
-        rubric: (window.COURSE_A && window.COURSE_A.rubric) || []
-      };
-
-      const resp = await fetch('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload) // server only *needs* transcript & durationSec; extra fields are optional
-      });
-
-      const data = await resp.json();
-      if (!resp.ok) {
-        aiOut.textContent = 'AI error: ' + (data.error || resp.statusText || 'Unknown');
-        return;
-      }
-
-      // Expect: { wpm, word_count, duration_sec, fillers, model, feedback }
-      const stats = [
-        `Model: ${data.model}`,
-        `Words: ${data.word_count}`,
-        `Duration: ${data.duration_sec}s`,
-        `WPM: ${data.wpm}`,
-        `Fillers: ${formatFillers(data.fillers)}`
-      ].join('\n');
-
-      aiOut.textContent = `${stats}\n\n=== Feedback ===\n${data.feedback}`;
-    } catch (err) {
-      console.error(err);
-      aiOut.textContent = 'AI error: ' + err.message;
-    }
-  };
 }
 
 function formatFillers(obj) {
@@ -214,4 +212,3 @@ function formatFillers(obj) {
   if (!entries.length) return 'none';
   return entries.map(([k, v]) => `${k}:${v}`).join(', ');
 }
-

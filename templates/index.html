@@ -9,49 +9,45 @@
 <body>
   <header class="wrap">
     <h1>MVP Speaking — Course A</h1>
-    <p class="sub">Record • Practice Phrases • Get WPM • See Rubric • (Optional) AI Feedback</p>
+    <p class="sub">Record • Practice Phrases • Get WPM • See Rubric • AI Feedback</p>
   </header>
 
-  <pre id="aiOut" style="white-space:pre-wrap;"></pre>
-
-
-  <main class="wrap grid">
+  <main class="wrap">
     <section class="card">
-      <h2>1) Record your answer</h2>
-      <div id="recorder">
-        <button id="btnStart">Start Recording</button>
+      <h2>1) Record</h2>
+      <div class="row">
+        <button id="btnStart">Start</button>
         <button id="btnStop" disabled>Stop</button>
-        <span id="timer">00:00</span>
+        <div id="timer">00:00</div>
       </div>
       <audio id="player" controls></audio>
       <div id="uploadStatus" class="muted"></div>
+    </section>
+
+    <section class="card">
+      <h2>2) Transcript</h2>
+      <textarea id="transcript" rows="8" placeholder="Transcript will appear here (or paste your own)..."></textarea>
       <input type="hidden" id="fileId"/>
-    </section>
-
-    <section class="card">
-      <h2>2) Course A — Phrases</h2>
-      <ul id="phrases"></ul>
-      <h2 style="margin-top:1rem;">Rubric</h2>
-      <div id="rubric"></div>
-    </section>
-
-    <section class="card">
-      <h2>3) Transcript & Analyze</h2>
-      <p class="muted">If AI transcription is enabled server-side, this will auto-fill. Otherwise, paste/edit your transcript here.</p>
-      <textarea id="transcript" rows="8" placeholder="Transcript will appear here..."></textarea>
-      <div class="actions">
+      <div class="row">
         <button id="btnAnalyze">Analyze (WPM)</button>
       </div>
-      <div id="report" class="report"></div>
-      <div id="aiBlock" data-has-openai="{{ 'true' if has_openai else 'false' }}">
-        <h3>AI Feedback (optional)</h3>
-        {% if has_openai %}
-          <button id="btnAI">Get AI Feedback</button>
-          <pre id="aiOut"></pre>
-        {% else %}
-          <p class="muted">AI disabled — set <code>OPENAI_API_KEY</code> on the server to enable Whisper + GPT feedback.</p>
-        {% endif %}
-      </div>
+      <pre id="report"></pre>
+    </section>
+
+    <section class="card">
+      <h2>3) Course A Phrases</h2>
+      <ul id="phrases"></ul>
+    </section>
+
+    <section class="card">
+      <h2>4) Rubric</h2>
+      <div id="rubric" class="rubric"></div>
+    </section>
+
+    <section class="card">
+      <h2>5) AI Feedback (uses your server's OpenAI key)</h2>
+      <button id="btnAI">Get AI Feedback</button>
+      <pre id="aiOut" style="white-space:pre-wrap;"></pre>
     </section>
   </main>
 
