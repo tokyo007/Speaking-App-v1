@@ -6,23 +6,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/static/styles.css" />
   <style>
-    .wrap{max-width:900px;margin:20px auto;padding:0 12px}
-    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin:12px 0}
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .pill{border:1px solid #e5e7eb;border-radius:999px;padding:4px 10px;background:#f8fafc}
-    .muted{color:#334155}
-    .badge{display:inline-block;margin-right:6px;padding:2px 8px;border-radius:6px;background:#f1f5f9}
-    .badge.good{background:#ecfdf5}
-    .badge.warn{background:#fff7ed}
-    .badge.bad{background:#fef2f2}
-    .bar{margin:8px 0}
-    .bar .track{height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden}
+    :root{
+      --text:#0f172a;    /* slate-900 */
+      --sub:#1f2937;     /* gray-800  */
+      --muted:#475569;   /* slate-600 */
+      --bg:#ffffff;
+      --card:#ffffff;
+      --border:#cbd5e1;
+      --good:#16a34a; --warn:#f59e0b; --bad:#dc2626;
+    }
+    html,body{
+      background:var(--bg);
+      color:var(--text);
+      font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+    }
+    h1{font-size:28px; font-weight:750; color:var(--sub); margin:8px 0 4px;}
+    h2{font-size:20px; font-weight:700; color:var(--sub); margin:8px 0;}
+    h3{font-size:18px; font-weight:650; color:var(--sub); margin:8px 0;}
+    .wrap{max-width:960px;margin:20px auto;padding:0 14px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin:14px 0}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .pill{border:1px solid var(--border);border-radius:999px;padding:6px 12px;background:#f8fafc;color:var(--sub)}
+    .muted{color:var(--muted)}
+    .badge{display:inline-block;margin:4px 8px 0 0;padding:4px 10px;border-radius:999px;background:#eef2ff;color:#111827;font-weight:600}
+    .badge.good{background:#dcfce7} .badge.warn{background:#ffedd5} .badge.bad{background:#fee2e2}
+    .bar{margin:10px 0}
+    .bar label{display:flex;justify-content:space-between;font-weight:600;color:var(--sub);margin-bottom:4px}
+    .bar .track{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden}
     .bar .fill{height:100%}
-    table{width:100%;border-collapse:collapse}
-    th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left}
-    tr.bad{background:#fff1f2}
-    .kvs{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(200px,1fr));gap:8px}
-    .kvs li{display:flex;justify-content:space-between;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;background:#f8fafc}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border:1px solid var(--border);padding:8px 10px;text-align:left}
+    thead th{background:#f8fafc;color:var(--sub)}
+    tr.bad{background:#fef2f2}
+    .kvs{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px}
+    .kvs li{display:flex;justify-content:space-between;border:1px solid var(--border);border-radius:10px;padding:8px 12px;background:#f8fafc}
+    .kvs strong{font-size:18px}
+    .note{border-left:5px solid #e5e7eb; padding-left:12px}
+    .lead{font-size:18px}
   </style>
 </head>
 <body>
@@ -32,10 +52,16 @@
       <div id="meta" class="muted"></div>
     </header>
 
+    <!-- Prominent metrics at the top -->
     <section class="card">
-      <div id="badges"></div>
+      <h2>Performance Metrics</h2>
+      <div id="metricsTop"></div>
+    </section>
+
+    <section class="card">
+      <div id="badges" class="lead"></div>
       <div id="estimates" style="margin-top:8px"></div>
-      <div id="rubric" class="muted" style="margin-top:8px; padding-left:10px; border-left:4px solid #e5e7eb"></div>
+      <div id="rubric" class="note" style="margin-top:8px"></div>
     </section>
 
     <section class="card">
@@ -54,7 +80,7 @@
     </section>
 
     <section class="card">
-      <h3>Metrics</h3>
+      <h3>Metrics (detail)</h3>
       <div id="metrics"></div>
     </section>
 
@@ -64,6 +90,7 @@
     </div>
   </div>
 
-  <script src="/static/report.js?v=auto-report-5"></script>
+  <script src="/static/report.js?v=auto-contrast-1"></script>
 </body>
 </html>
+
