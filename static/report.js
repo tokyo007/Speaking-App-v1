@@ -126,4 +126,35 @@ window.addEventListener('DOMContentLoaded', ()=>{
 
   // Words table
   const words = extractWords(r.detail || {});
-  setText('wlNote','Rows in pink indicate likely
+  setText('wlNote','Rows in pink indicate likely issues (error or low accuracy).');
+  if (!words.length) {
+    setHTML('wordsTable', '<div class="muted">No word-level details.</div>');
+  } else {
+    const rows = words.map(w=>{
+      const word = w.Word ?? w.word ?? '';
+      const err  = w.ErrorType ?? w.errorType ?? 'None';
+      const pa   = w.PronunciationAssessment ?? w.pronunciationAssessment ?? {};
+      const acc  = pa.AccuracyScore ?? pa.accuracyScore ?? null;
+      const bad  = (err && err!=='None') || (acc!==null && acc<60);
+      return `<tr class="${bad?'bad':''}"><td>${word}</td><td>${acc!==null?Math.round(acc):'-'}</td><td>${err}</td></tr>`;
+    }).join('');
+    setHTML('wordsTable', `<table><thead><tr><th>Word</th><th>Accuracy</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table>`);
+  }
+
+  // Metrics (includes WPM)
+  renderMetrics(r);
+
+  // PDF button
+  const btn = byId('btnPdf');
+  if (btn && (r.result_id || r.pdf_url)) {
+    btn.disabled = false;
+    btn.onclick = () => {
+      const href = (r.pdf_url || `/report_pdf/${r.result_id}`);
+      // navigation is more reliable than window.open (pop-up blockers)
+      window.location.href = href;
+    };
+  }
+});
+
+// Expose for button
+window.downloadJSON = downloadJSON;
