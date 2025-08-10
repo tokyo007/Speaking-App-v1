@@ -1,4 +1,5 @@
-let mediaRecorder, chunks=[], startTime=0, timerInterval=null;
+let mediaRecorder, chunks = [], startTime = 0, stopTime = 0, timerInterval = null, lastDurationSec = 0;
+
 const btnStart = document.getElementById('btnStart');
 const btnStop = document.getElementById('btnStop');
 const timer = document.getElementById('timer');
@@ -10,16 +11,19 @@ const fileIdEl = document.getElementById('fileId');
 const btnAnalyze = document.getElementById('btnAnalyze');
 const aiBlock = document.getElementById('aiBlock');
 const btnAI = document.getElementById('btnAI');
+const aiOut = document.getElementById('aiOut'); // make sure this exists in HTML
 
-(function renderCourse(){
+(function renderCourse() {
   const phrasesUl = document.getElementById('phrases');
   const rubricDiv = document.getElementById('rubric');
-  const data = window.COURSE_A || {phrases:[], rubric:[]};
+  const data = window.COURSE_A || { phrases: [], rubric: [] };
+
   data.phrases.forEach(p => {
     const li = document.createElement('li');
     li.textContent = p;
     phrasesUl.appendChild(li);
   });
+
   data.rubric.forEach(r => {
     const d = document.createElement('div');
     d.className = 'rubric-item';
@@ -31,15 +35,23 @@ const btnAI = document.getElementById('btnAI');
 })();
 
 btnStart.onclick = async () => {
-  chunks = [];
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  mediaRecorder = new MediaRecorder(stream);
-  mediaRecorder.ondataavailable = e => chunks.push(e.data);
-  mediaRecorder.onstop = onStopRecording;
-  mediaRecorder.start();
-  startTimer();
-  btnStart.disabled = true;
-  btnStop.disabled = false;
+  try {
+    chunks = [];
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+    mediaRecorder.onstop = onStopRecording;
+    mediaRecorder.start();
+    startTimer();
+    btnStart.disabled = true;
+    btnStop.disabled = false;
+    uploadStatus.textContent = '';
+    aiOut && (aiOut.textContent = '');
+    reportEl.textContent = '';
+  } catch (err) {
+    console.error(err);
+    alert('Microphone access failed.');
+  }
 };
 
 btnStop.onclick = () => {
@@ -51,94 +63,155 @@ btnStop.onclick = () => {
   btnStop.disabled = true;
 };
 
-function startTimer(){
+function startTimer() {
   startTime = Date.now();
-  timerInterval = setInterval(()=>{
-    const s = Math.floor((Date.now()-startTime)/1000);
-    const mm = String(Math.floor(s/60)).padStart(2,'0');
-    const ss = String(s%60).padStart(2,'0');
+  stopTime = 0;
+  timerInterval = setInterval(() => {
+    const s = Math.floor((Date.now() - startTime) / 1000);
+    const mm = String(Math.floor(s / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
     timer.textContent = `${mm}:${ss}`;
   }, 200);
 }
-function stopTimer(){
+
+function stopTimer() {
   clearInterval(timerInterval);
+  stopTime = Date.now();
+  lastDurationSec = Math.max(1, Math.floor((stopTime - startTime) / 1000)); // avoid 0
 }
 
-async function onStopRecording(){
-  const blob = new Blob(chunks, { type: 'audio/webm' });
-  player.src = URL.createObjectURL(blob);
-  uploadStatus.textContent = 'Uploading...';
-  const form = new FormData();
-  form.append('audio', blob, `recording-${Date.now()}.webm`);
-  const durationSec = Math.floor((Date.now()-startTime)/1000);
-  form.append('duration', String(durationSec));
+async function onStopRecording() {
+  try {
+    const blob = new Blob(chunks, { type: 'audio/webm' });
+    player.src = URL.createObjectURL(blob);
+    uploadStatus.textContent = 'Uploading...';
 
-  const resp = await fetch('/upload', { method:'POST', body: form });
-  const data = await resp.json();
-  if(!data.ok){
-    uploadStatus.textContent = 'Upload failed: '+(data.error||'Unknown error');
-    return;
-  }
-  uploadStatus.textContent = `Uploaded: ${data.file_id} (${durationSec}s)`;
-  fileIdEl.value = data.file_id;
-  if (data.transcript){
-    transcriptEl.value = data.transcript;
-  } else if (data.transcript_error){
-    console.warn('Transcription error:', data.transcript_error);
+    const form = new FormData();
+    form.append('audio', blob, `recording-${Date.now()}.webm`);
+    form.append('duration', String(lastDurationSec || parseTimerToSeconds()));
+
+    const resp = await fetch('/upload', { method: 'POST', body: form });
+    const data = await resp.json();
+
+    if (!resp.ok || !data.ok) {
+      uploadStatus.textContent = 'Upload failed: ' + (data.error || resp.statusText || 'Unknown error');
+      return;
+    }
+
+    uploadStatus.textContent = `Uploaded: ${data.file_id} (${lastDurationSec}s)`;
+    fileIdEl.value = data.file_id;
+
+    if (data.transcript) {
+      transcriptEl.value = data.transcript;
+    } else if (data.transcript_error) {
+      console.warn('Transcription error:', data.transcript_error);
+    }
+  } catch (err) {
+    console.error(err);
+    uploadStatus.textContent = 'Upload failed.';
   }
 }
 
 btnAnalyze.onclick = async () => {
-  const durationSec = parseTimerToSeconds();
-  const form = new FormData();
-  form.append('transcript', transcriptEl.value || '');
-  form.append('duration', String(durationSec));
-  const resp = await fetch('/analyze', { method:'POST', body: form });
-  const data = await resp.json();
-  if(!data.ok){
-    reportEl.textContent = 'Analyze failed';
-    return;
+  try {
+    const durationSec = getDurationSec();
+    const form = new FormData();
+    form.append('transcript', transcriptEl.value || '');
+    form.append('duration', String(durationSec));
+
+    const resp = await fetch('/analyze', { method: 'POST', body: form });
+    const data = await resp.json();
+
+    if (!resp.ok || !data.ok) {
+      reportEl.textContent = 'Analyze failed: ' + (data.error || resp.statusText || 'Unknown');
+      return;
+    }
+
+    const lines = [
+      `Words: ${data.word_count}`,
+      `Duration: ${data.duration_sec}s`,
+      `WPM: ${data.wpm}`,
+      `Filler words: ${data.filler_count}`
+    ];
+    reportEl.textContent = lines.join('\n');
+  } catch (err) {
+    console.error(err);
+    reportEl.textContent = 'Analyze failed.';
   }
-  const lines = [
-    `Words: ${data.word_count}`,
-    `Duration: ${data.duration_sec}s`,
-    `WPM: ${data.wpm}`,
-    `Filler words: ${data.filler_count}`
-  ];
-  reportEl.textContent = lines.join('\n');
 };
 
-function parseTimerToSeconds(){
-  const [mm, ss] = timer.textContent.split(':').map(Number);
-  return (mm*60+ss)||0;
+function parseTimerToSeconds() {
+  const parts = (timer.textContent || '').split(':').map(Number);
+  if (parts.length === 2 && !Number.isNaN(parts[0]) && !Number.isNaN(parts[1])) {
+    return (parts[0] * 60 + parts[1]) || 0;
+  }
+  return 0;
 }
 
-if (aiBlock && aiBlock.dataset.hasOpenai==='true'){
-  if (btnAI){
-    btnAI.onclick = async () => {
-      const durationSec = parseTimerToSeconds();
-      const minutes = Math.max(durationSec/60, 0.000001);
-      const words = (transcriptEl.value||'').split(/\s+/).filter(Boolean).length;
-      const wpm = words/minutes;
+function getDurationSec() {
+  // Prefer the measured stop-start duration; fall back to timer text.
+  return lastDurationSec || parseTimerToSeconds() || 0;
+}
 
-      const payload = {
-        transcript: transcriptEl.value||'',
-        rubric: (window.COURSE_A && window.COURSE_A.rubric) || [],
-        phrases: (window.COURSE_A && window.COURSE_A.phrases) || [],
-        wpm: Number(wpm.toFixed(1))
-      };
-      const resp = await fetch('/ai-feedback', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(payload)
-      });
-      const data = await resp.json();
-      const out = document.getElementById('aiOut');
-      if(!data.ok){
-        out.textContent = 'AI error: ' + (data.error || 'Unknown');
+// === NEW: Call your backend OpenAI integration at /api/feedback ===
+if (aiBlock && btnAI) {
+  btnAI.onclick = async () => {
+    try {
+      const transcript = (transcriptEl.value || '').trim();
+      const durationSec = getDurationSec();
+
+      if (!transcript) {
+        aiOut.textContent = 'Please generate or paste a transcript first.';
         return;
       }
-      out.textContent = JSON.stringify(data.feedback, null, 2);
-    };
-  }
+      if (!durationSec || durationSec <= 0) {
+        aiOut.textContent = 'Recording duration is missing or invalid.';
+        return;
+      }
+
+      aiOut.textContent = 'Getting AI feedback...';
+
+      // Optional context: send phrases & rubric if you want your server to include them
+      const payload = {
+        transcript,
+        durationSec,
+        phrases: (window.COURSE_A && window.COURSE_A.phrases) || [],
+        rubric: (window.COURSE_A && window.COURSE_A.rubric) || []
+      };
+
+      const resp = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload) // server only *needs* transcript & durationSec; extra fields are optional
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        aiOut.textContent = 'AI error: ' + (data.error || resp.statusText || 'Unknown');
+        return;
+      }
+
+      // Expect: { wpm, word_count, duration_sec, fillers, model, feedback }
+      const stats = [
+        `Model: ${data.model}`,
+        `Words: ${data.word_count}`,
+        `Duration: ${data.duration_sec}s`,
+        `WPM: ${data.wpm}`,
+        `Fillers: ${formatFillers(data.fillers)}`
+      ].join('\n');
+
+      aiOut.textContent = `${stats}\n\n=== Feedback ===\n${data.feedback}`;
+    } catch (err) {
+      console.error(err);
+      aiOut.textContent = 'AI error: ' + err.message;
+    }
+  };
 }
+
+function formatFillers(obj) {
+  if (!obj || typeof obj !== 'object') return 'n/a';
+  const entries = Object.entries(obj).filter(([, v]) => v > 0);
+  if (!entries.length) return 'none';
+  return entries.map(([k, v]) => `${k}:${v}`).join(', ');
+}
+
