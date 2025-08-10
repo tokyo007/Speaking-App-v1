@@ -1,90 +1,64 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>MVP Speaking App — Prompt (Exam Selection)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    :root{
-      --brand-bg:#0b132b; --brand:#1c7ed6; --accent:#f59e0b;
-      --card:#ffffff; --ink:#0f172a; --muted:#64748b; --border:#e5e7eb;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f6f7fb;color:var(--ink)}
-    header{background:var(--brand-bg);color:#fff;padding:16px;display:flex;align-items:center;justify-content:space-between}
-    header h1{margin:0;font-size:18px}
-    header a{color:#fff;text-decoration:none;opacity:.9}
-    .wrap{max-width:980px;margin:16px auto;padding:0 16px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
-    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .muted{color:var(--muted);font-size:13px}
-    label{font-size:13px;color:var(--muted)}
-    select,button{border:1px solid var(--border);border-radius:10px;padding:10px;background:#fff}
-    button.primary{background:var(--brand);color:#fff;border-color:transparent}
-    button.warn{background:var(--accent);color:#111;border-color:transparent}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    #promptBox{background:#fbfdff;border:1px solid var(--border);border-radius:12px;padding:12px}
-    audio{display:block;margin-top:8px}
-    @media (max-width:520px){
-      header h1{font-size:16px}
-      select,button{width:100%}
-    }
-  </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>MVP Speaking — Course A</title>
+  <link rel="stylesheet" href="/static/styles.css"/>
 </head>
 <body>
-  <header>
-    <h1>MakoStars • Speaking (Exam Prompt)</h1>
-    <a href="/report">View Last Report →</a>
+  <header class="wrap">
+    <h1>MVP Speaking — Course A</h1>
+    <p class="sub">Record • Practice Phrases • Get WPM • See Rubric • (Optional) AI Feedback</p>
   </header>
 
-  <main class="wrap">
+  <main class="wrap grid">
     <section class="card">
-      <h2 style="margin:0 0 6px">Course B — Prompt Response</h2>
-      <p class="muted" style="margin:0 0 12px">
-        Choose a test → group → question. Record a 30–60s answer. We’ll assess pronunciation and show your report.
-      </p>
-
-      <div class="row" style="margin-bottom:8px">
-        <label for="testType">Test</label>
-        <select id="testType" aria-label="Test type"></select>
-
-        <label for="groupId">Group</label>
-        <select id="groupId" aria-label="Question group"></select>
-
-        <label for="questionId">Question</label>
-        <select id="questionId" aria-label="Question"></select>
-
-        <button id="randQ" class="warn" type="button" title="Random question">🎲 Random</button>
+      <h2>1) Record your answer</h2>
+      <div id="recorder">
+        <button id="btnStart">Start Recording</button>
+        <button id="btnStop" disabled>Stop</button>
+        <span id="timer">00:00</span>
       </div>
+      <audio id="player" controls></audio>
+      <div id="uploadStatus" class="muted"></div>
+      <input type="hidden" id="fileId"/>
+    </section>
 
-      <div id="promptBox">
-        <div class="muted" style="margin-bottom:6px">Prompt</div>
-        <div id="promptText" style="line-height:1.5"></div>
+    <section class="card">
+      <h2>2) Course A — Phrases</h2>
+      <ul id="phrases"></ul>
+      <h2 style="margin-top:1rem;">Rubric</h2>
+      <div id="rubric"></div>
+    </section>
+
+    <section class="card">
+      <h2>3) Transcript & Analyze</h2>
+      <p class="muted">If AI transcription is enabled server-side, this will auto-fill. Otherwise, paste/edit your transcript here.</p>
+      <textarea id="transcript" rows="8" placeholder="Transcript will appear here..."></textarea>
+      <div class="actions">
+        <button id="btnAnalyze">Analyze (WPM)</button>
       </div>
-
-      <div class="row" style="margin-top:10px">
-        <label for="lang">Language</label>
-        <select id="lang">
-          <option value="en-US">English (US)</option>
-          <option value="en-GB">English (UK)</option>
-        </select>
+      <div id="report" class="report"></div>
+      <div id="aiBlock" data-has-openai="{{ 'true' if has_openai else 'false' }}">
+        <h3>AI Feedback (optional)</h3>
+        {% if has_openai %}
+          <button id="btnAI">Get AI Feedback</button>
+          <pre id="aiOut"></pre>
+        {% else %}
+          <p class="muted">AI disabled — set <code>OPENAI_API_KEY</code> on the server to enable Whisper + GPT feedback.</p>
+        {% endif %}
       </div>
-
-      <div class="row" style="margin-top:12px">
-        <button id="recordBtn" class="primary" type="button">🎤 Record</button>
-        <button id="stopBtn" type="button" disabled>⏹ Stop</button>
-        <span id="status" class="muted"></span>
-      </div>
-
-      <audio id="playback" controls></audio>
-
-      <p class="muted" style="margin-top:8px">
-        Tip: If embedded in an LMS iframe, the iframe must include <code>allow="microphone"</code>.
-      </p>
     </section>
   </main>
 
-  <!-- Load AFTER the DOM so addEventListener finds the elements -->
-  <script src="/static/recorder.js?v=2025-08-10-3"></script>
+  <footer class="wrap muted">
+    <small>Uploads are stored temporarily on the server. Edit <code>course_a.json</code> to customize phrases & rubric.</small>
+  </footer>
+
+  <script>
+    window.COURSE_A = {{ course_a | tojson }};
+  </script>
+  <script src="/static/recorder.js"></script>
 </body>
 </html>
