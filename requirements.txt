@@ -5,3 +5,4 @@ azure-cognitiveservices-speech
 ffmpeg-python
 pydub
 gunicorn
+reportlab
