@@ -1,138 +1,71 @@
-import os
-from flask import Flask, render_template, request, jsonify, send_from_directory
-from werkzeug.utils import secure_filename
-import time, uuid, json
-
-# Optional OpenAI imports — only used if OPENAI_API_KEY present
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-try:
-    if OPENAI_API_KEY:
-        from openai import OpenAI
-        openai_client = OpenAI(api_key=OPENAI_API_KEY)
-    else:
-        openai_client = None
-except Exception:
-    openai_client = None
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-COURSE_A_PATH = os.path.join(BASE_DIR, "course_a.json")
-
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+import os, re, math
+from flask import Flask, request, jsonify
+from openai import OpenAI
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app)
 
-def load_course_a():
-    try:
-        with open(COURSE_A_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {"title":"Course A","phrases":[],"rubric":[]}
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # fast & cost-effective
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-@app.route("/")
-def index():
-    course_a = load_course_a()
-    return render_template("index.html", course_a=course_a, has_openai=bool(openai_client))
+FILLERS = {"um","uh","er","ah","like","you know","sort of","kind of"}
 
-@app.route("/static/<path:path>")
-def send_static(path):
-    return send_from_directory(os.path.join(BASE_DIR, "static"), path)
+def words_per_minute(text: str, duration_sec: float):
+    words = re.findall(r"\b[\w’'-]+\b", text, flags=re.UNICODE)
+    wpm = 0.0 if duration_sec <= 0 else (len(words) / (duration_sec / 60.0))
+    return round(wpm, 1), len(words)
 
-@app.route("/upload", methods=["POST"])
-def upload():
-    """
-    Accepts audio Blob under 'audio' field. Returns file_id and (optional) transcript using Whisper.
-    Client also sends 'duration' (seconds) captured during recording.
-    """
-    if "audio" not in request.files:
-        return jsonify({"ok": False, "error": "No audio file"}), 400
+def count_fillers(text: str):
+    t = text.lower()
+    return {f: len(re.findall(rf"\b{re.escape(f)}\b", t)) for f in FILLERS}
 
-    file = request.files["audio"]
-    filename = secure_filename(file.filename) or f"recording-{uuid.uuid4().hex}.webm"
-    save_path = os.path.join(UPLOAD_DIR, filename)
-    file.save(save_path)
+SYSTEM_PROMPT = (
+    "You are an ESL speaking coach for intermediate learners. "
+    "Given a speech transcript, provide concise, actionable feedback with:\n"
+    "1) Fluency (pace, pauses), 2) Pronunciation highlights, "
+    "3) Grammar/Vocabulary fixes with better alternatives, "
+    "4) 2-3 targeted practice tips.\n"
+    "Keep it supportive and specific. 150-220 words."
+)
 
-    duration = float(request.form.get("duration", "0"))
-    result = {"ok": True, "file_id": filename, "duration": duration}
-
-    # If OpenAI is configured, try Whisper transcription
-    if openai_client:
-        try:
-            with open(save_path, "rb") as af:
-                transcription = openai_client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=af,
-                    response_format="text"
-                )
-            result["transcript"] = transcription
-        except Exception as e:
-            result["transcript_error"] = str(e)
-
-    return jsonify(result), 200
-
-@app.route("/ai-feedback", methods=["POST"])
-def ai_feedback():
-    """
-    Provide AI feedback using GPT, referencing the rubric, transcript, and WPM stats.
-    """
-    if not openai_client:
-        return jsonify({"ok": False, "error": "OPENAI_API_KEY not set"}), 400
-
+@app.post("/api/feedback")
+def feedback():
     data = request.get_json(force=True)
-    transcript = data.get("transcript", "").strip()
-    rubric = data.get("rubric", [])
-    wpm = data.get("wpm", 0)
-    target_phrases = data.get("phrases", [])
+    transcript = (data or {}).get("transcript", "").strip()
+    duration_sec = float((data or {}).get("durationSec", 0))
 
-    prompt = (
-        "You are an ESL speaking evaluator. Score and comment concisely using the rubric. "
-        "Return JSON with fields: overall_comments, strengths[], areas_to_improve[], "
-        "scores (dict of category->1-5), and phrase_hits (phrases the student used). "
-        f"\nRubric: {json.dumps(rubric, ensure_ascii=False)}"
-        f"\nTarget phrases: {json.dumps(target_phrases, ensure_ascii=False)}"
-        f"\nWPM: {wpm}"
-        f"\nTranscript: {transcript}\n"
+    if not transcript:
+        return jsonify(error="Missing 'transcript'"), 400
+    if duration_sec <= 0:
+        return jsonify(error="Missing or invalid 'durationSec' (seconds)"), 400
+
+    wpm, word_count = words_per_minute(transcript, duration_sec)
+    fillers = count_fillers(transcript)
+
+    # Build the model input (Responses API)
+    resp = client.responses.create(
+        model=OPENAI_MODEL,
+        instructions=SYSTEM_PROMPT,
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text",
+                     "text": f"Transcript:\n{transcript}\n\n"
+                             f"Stats:\n- Duration: {duration_sec:.1f}s\n- Words: {word_count}\n- WPM: {wpm}\n"
+                             f"- Fillers: {fillers}\n"}
+                ],
+            }
+        ],
     )
 
-    try:
-        completion = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-        )
-        content = completion.choices[0].message.content
-        try:
-            parsed = json.loads(content)
-        except Exception:
-            parsed = {"overall_comments": content, "raw": content}
-        return jsonify({"ok": True, "feedback": parsed})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/uploads/<path:fname>")
-def get_upload(fname):
-    return send_from_directory(UPLOAD_DIR, fname)
-
-@app.route("/analyze", methods=["POST"])
-def analyze():
-    """
-    Accept text transcript + duration, compute WPM, basic stats.
-    """
-    text = request.form.get("transcript", "").strip()
-    duration = float(request.form.get("duration", "0"))  # seconds
-
-    words = [w for w in text.replace("\n"," ").split(" ") if w.strip()]
-    word_count = len(words)
-    minutes = duration / 60.0 if duration > 0 else 0.000001
-    wpm = word_count / minutes
-
-    filler_words = ["um","uh","like","you know","er","ah"]
-    filler_count = sum(text.lower().count(fw) for fw in filler_words)
-
-    return jsonify({
-        "ok": True,
-        "word_count": word_count,
-        "duration_sec": duration,
-        "wpm": round(wpm, 1),
-        "filler_count": filler_count
-    })
+    feedback_text = resp.output_text  # convenient helper on SDK
+    return jsonify(
+        wpm=wpm,
+        word_count=word_count,
+        duration_sec=duration_sec,
+        fillers=fillers,
+        model=OPENAI_MODEL,
+        feedback=feedback_text,
+    )
